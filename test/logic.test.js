@@ -127,7 +127,11 @@ test('MODE_WIN_RATE_RANGES has the 4 groups with other/cherry/suika ranges as pr
   assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.cherry, [0.0092, 0.0168]);
   assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.suika, [0.0366, 0.0519]);
   assert.deepEqual(logic.MODE_WIN_RATE_RANGES.hikimodoshi.other, [1 / 119.16, 1 / 93.62]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.hikimodoshi.cherry, [0.0229, 0.0420]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.hikimodoshi.suika, [0.0916, 0.1297]);
   assert.deepEqual(logic.MODE_WIN_RATE_RANGES.chance.other, [1 / 99.30, 1 / 78.02]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.chance.cherry, [0.0275, 0.0504]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.chance.suika, [0.1099, 0.1556]);
   assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.other, [1 / 8.19, 1 / 8.19]);
   assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.cherry, [0.0625, 0.0816]);
   assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.suika, [0.2500, 0.3263]);
