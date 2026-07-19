@@ -69,6 +69,9 @@ function triggerBucket(yaku) {
 }
 
 // 契機役 → モード移行抽選表の行キー（chudanCherryとconfirmedを区別する）
+// NOT a wrapper around triggerBucket — kept as an independent function because
+// Task 8's mode-transition table gives chudanCherry its own row in every mode,
+// while triggerBucket's bonus-trigger lottery always folds chudanCherry into 'confirmed'.
 function transitionRole(yaku) {
   if (yaku === 'chudanCherry') return 'chudanCherry';
   if (yaku === 'kakuteiCherry' || yaku === 'kakuteiyaku') return 'confirmed';

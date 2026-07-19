@@ -60,6 +60,11 @@ test('rollYaku picks the role whose cumulative probability range contains the dr
   assert.equal(withMockRandom([0.99999], () => logic.rollYaku(1)), 'miss');
 });
 
+test('rollYaku lands in a middle role interval, not just the endpoints', () => {
+  const afterReplayAndBell = logic.KOYAKU_PROB.replay + logic.KOYAKU_PROB.oshijunBell;
+  assert.equal(withMockRandom([afterReplayAndBell + 0.00001], () => logic.rollYaku(1)), 'commonBell');
+});
+
 test('triggerBucket classifies confirmed-BIG roles, cherry, suika, and everything else', () => {
   assert.equal(logic.triggerBucket('chudanCherry'), 'confirmed');
   assert.equal(logic.triggerBucket('kakuteiCherry'), 'confirmed');
