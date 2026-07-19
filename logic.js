@@ -188,6 +188,146 @@ function rollFromDistribution(dist) {
   return keys[keys.length - 1];
 }
 
+// ===== ボーナス当選時のモード移行抽選表 =====
+const MODE_TRANSITION_TABLE = {
+  normalA: {
+    chudanCherry: { type: 'fixed', outcomes: { tengoku: 75.00, dokidoki: 24.22, superDokidoki: 0.78 } },
+    confirmed: { type: 'fixed', outcomes: { stay: 45.31, normalB: 25.00, tengoku: 25.00, dokidoki: 4.69 } },
+    suika: {
+      type: 'oddEven',
+      odd: { type: 'fixed', outcomes: { normalB: 50.00, tengoku: 20.31, dokidoki: 1.56 } },
+      even: { type: 'range', ranges: { normalB: [57.81, 60.94] }, fixed: { tengoku: 20.31, dokidoki: 1.56 } },
+      exceptions: { 3: { tengoku: 21.88 }, 6: { tengoku: 23.44 } },
+    },
+    other: { type: 'range', ranges: { normalB: [25.00, 39.06], tengoku: [10.16, 11.72] }, fixed: { dokidoki: 0.78 } },
+  },
+  normalB: {
+    chudanCherry: { type: 'fixed', outcomes: { tengoku: 50.00, dokidoki: 49.22, superDokidoki: 0.78 } },
+    confirmed: { type: 'fixed', outcomes: { stay: 25.00, tengoku: 50.00, dokidoki: 25.00 } },
+    suika: { type: 'range', ranges: { tengoku: [59.38, 67.97], dokidoki: [15.63, 20.31] } },
+    other: { type: 'range', ranges: { tengoku: [42.19, 54.69], dokidoki: [7.81, 10.16] } },
+  },
+  tengoku: {
+    cherry: { type: 'fixed', outcomes: { stay: 99.22, dokidoki: 0.78 } },
+    chudanCherry: { type: 'fixed', outcomes: { dokidoki: 100 } },
+    confirmed: { type: 'fixed', outcomes: { stay: 93.75, dokidoki: 6.25 } },
+    suika: { type: 'fixed', outcomes: { stay: 98.44, dokidoki: 0.78 } },
+    other: {
+      type: 'oddEven',
+      odd: { type: 'fixed', outcomes: { stay: 74.22, hikimodoshi: 7.81, normalA: 13.28, normalB: 3.91, dokidoki: 0.78 } },
+      even: { type: 'fixed', outcomes: { stay: 64.84, hikimodoshi: 17.19, normalA: 13.28, normalB: 3.91, dokidoki: 0.78 } },
+    },
+  },
+  dokidoki: {
+    chudanCherry: { type: 'fixed', outcomes: { superDokidoki: 100 } },
+    confirmed: { type: 'fixed', outcomes: { stay: 96.88, superDokidoki: 3.13 } },
+    cherry: { type: 'fixed', outcomes: { stay: 99.61, superDokidoki: 0.39 } },
+    suika: { type: 'fixed', outcomes: { stay: 99.22, superDokidoki: 0.78 } },
+    other: { type: 'fixed', outcomes: { hosho: 17.97, stay: 81.64, superDokidoki: 0.39 } },
+  },
+  superDokidoki: {
+    chudanCherry: { type: 'fixed', outcomes: { stay: 100 } },
+    confirmed: { type: 'fixed', outcomes: { stay: 100 } },
+    cherry: { type: 'fixed', outcomes: { stay: 100 } },
+    suika: { type: 'fixed', outcomes: { stay: 100 } },
+    other: { type: 'fixed', outcomes: { stay: 90.63, hosho: 9.38 } },
+  },
+  hosho: {
+    chudanCherry: { type: 'fixed', outcomes: { tengoku: 75.00, dokidoki: 24.22, superDokidoki: 0.78 } },
+    confirmed: { type: 'fixed', outcomes: { stay: 75.00, tengoku: 22.66, dokidoki: 2.34 } },
+    suika: { type: 'fixed', outcomes: { stay: 91.41, tengoku: 7.81, dokidoki: 0.78 } },
+    cherry: { type: 'fixed', outcomes: { stay: 95.70, tengoku: 3.91, dokidoki: 0.39 } },
+    other: { type: 'fixed', outcomes: { normalA: 65.23, normalB: 10.16, hikimodoshi: 20.31, tengoku: 3.91, dokidoki: 0.39 } },
+  },
+  hikimodoshi: {
+    chudanCherry: { type: 'fixed', outcomes: { tengoku: 75.00, dokidoki: 24.22, superDokidoki: 0.78 } },
+    confirmed: { type: 'fixed', outcomes: { normalB: 50.00, tengoku: 45.31, dokidoki: 4.69 } },
+    suika: {
+      type: 'range',
+      ranges: { normalA: [21.88, 25.00], normalB: [39.06, 45.31], tengoku: [31.25, 34.38] },
+      fixed: { dokidoki: 1.56 },
+    },
+    other: {
+      type: 'range',
+      ranges: { normalA: [32.03, 50.00], normalB: [32.81, 51.56], tengoku: [15.63, 17.19] },
+      fixed: { dokidoki: 0.78 },
+    },
+  },
+  chance: {
+    chudanCherry: { type: 'fixed', outcomes: { tengoku: 50.00, dokidoki: 42.19, superDokidoki: 7.81 } },
+    confirmed: { type: 'fixed', outcomes: { normalB: 25.00, tengoku: 65.63, dokidoki: 7.03, superDokidoki: 2.34 } },
+    suika: { type: 'fixed', outcomes: { normalB: 65.63, tengoku: 31.25, dokidoki: 2.34, superDokidoki: 0.78 } },
+    other: { type: 'fixed', outcomes: { normalB: 82.81, tengoku: 15.63, dokidoki: 1.17, superDokidoki: 0.39 } },
+  },
+};
+
+// oddEvenの奇偶分岐内にある'range'行専用の補間。
+// 通常のinterpolateBySettingは設定1〜6全体の階段カーブを使うが、
+// oddEven分岐は奇数{1,3,5}または偶数{2,4,6}という3設定だけの部分集合に
+// しか登場しないため、その部分集合の最小設定を0・最大設定を1とする
+// 独自の直線補間を行う（例: suika偶数分岐は設定2で最小値、設定6で最大値）。
+function interpolateWithinParity(min, max, setting) {
+  const first = setting % 2 === 0 ? 2 : 1; // 部分集合の最初の設定（2 or 1）
+  const position = (setting - first) / 4; // 設定2,4,6 or 1,3,5 → 0, 0.5, 1
+  return min + position * (max - min);
+}
+
+function computeRawOutcomes(row, setting, useLocalInterpolation) {
+  if (row.type === 'fixed') return { ...row.outcomes };
+  if (row.type === 'range') {
+    const raw = { ...(row.fixed || {}) };
+    for (const [k, [min, max]] of Object.entries(row.ranges)) {
+      raw[k] = useLocalInterpolation
+        ? interpolateWithinParity(min, max, setting)
+        : interpolateBySetting(min, max, setting);
+    }
+    return raw;
+  }
+  if (row.type === 'oddEven') {
+    const branch = setting % 2 === 0 ? row.even : row.odd;
+    const raw = computeRawOutcomes(branch, setting, true);
+    if (row.exceptions && row.exceptions[setting]) {
+      Object.assign(raw, row.exceptions[setting]);
+    }
+    return raw;
+  }
+  throw new Error('unknown mode transition row type: ' + row.type);
+}
+
+// role: transitionRole()の戻り値（'chudanCherry'|'confirmed'|'cherry'|'suika'|'other'）
+function resolveModeTransition(mode, role, setting) {
+  const modeTable = MODE_TRANSITION_TABLE[mode];
+  const row = modeTable[role] || modeTable.other;
+  const raw = computeRawOutcomes(row, setting);
+
+  // 元データが既に「stay」を明示的な出現率として含んでいる行（=原資料が
+  // 「残り全部」ではなく完結した内訳として提示している行）は、それ自体が
+  // 完全な分布として扱う。normalizeDistribution（合計が100未満なら残余を
+  // stayとして追加、100以上なら比例縮小）を適用すると、原資料側の丸め
+  // （合計が99.xx/100.0xになる程度の誤差）まで歪めてstay値を書き換えて
+  // しまうため、ここではnormalizeDistributionを通さずそのまま返す。
+  if (Object.prototype.hasOwnProperty.call(raw, 'stay')) {
+    return { ...raw };
+  }
+
+  const result = normalizeDistribution(raw);
+
+  // normalizeDistributionが残余として新規に追加したstayは、浮動小数点演算
+  // の丸め誤差で例えば28.13が28.129999999999995になることがあるため、
+  // 元データの精度（小数点以下2桁）に丸め直す。ただし、設定2〜5の補間の
+  // ように残余そのものが真に小数第3位以下まで意味を持つ値の場合は丸めては
+  // いけない（丸めると合計100%からずれてしまう）。そのためズレが浮動小数点
+  // 誤差相当（1e-6未満）の場合にのみ丸めを適用する。合計が100以上で比例縮小
+  // されたケース（stayが存在しない）はここには来ない。
+  if (Object.prototype.hasOwnProperty.call(result, 'stay')) {
+    const rounded = Math.round(result.stay * 100) / 100;
+    if (Math.abs(rounded - result.stay) < 1e-6) {
+      result.stay = rounded;
+    }
+  }
+  return result;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -208,5 +348,7 @@ if (typeof module !== 'undefined' && module.exports) {
     rollBonusTrigger,
     normalizeDistribution,
     rollFromDistribution,
+    MODE_TRANSITION_TABLE,
+    resolveModeTransition,
   };
 }

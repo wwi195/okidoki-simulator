@@ -172,3 +172,118 @@ test('rollFromDistribution picks the outcome whose cumulative range contains the
   assert.equal(withMockRandom([0.35], () => logic.rollFromDistribution(dist)), 'b');
   assert.equal(withMockRandom([0.99], () => logic.rollFromDistribution(dist)), 'stay');
 });
+
+test('normalA chudanCherry/confirmed transitions are fixed', () => {
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'chudanCherry', 1),
+    { tengoku: 75.00, dokidoki: 24.22, superDokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'confirmed', 1),
+    { stay: 45.31, normalB: 25.00, tengoku: 25.00, dokidoki: 4.69 });
+});
+
+test('normalA suika transition: odd settings fixed, even settings ranged, with setting3/6 exceptions', () => {
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 1),
+    { normalB: 50.00, tengoku: 20.31, dokidoki: 1.56, stay: 28.13 });
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 3),
+    { normalB: 50.00, tengoku: 21.88, dokidoki: 1.56, stay: 26.56 });
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 2),
+    { normalB: 57.81, tengoku: 20.31, dokidoki: 1.56, stay: 20.32 });
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 6),
+    { normalB: 60.94, tengoku: 23.44, dokidoki: 1.56, stay: 14.06 });
+});
+
+test('normalA other (cherry falls back to it too) is ranged with a fixed dokidoki', () => {
+  const s1 = logic.resolveModeTransition('normalA', 'other', 1);
+  assert.equal(s1.normalB, 25.00);
+  assert.equal(s1.tengoku, 10.16);
+  assert.equal(s1.dokidoki, 0.78);
+  assert.ok(Math.abs(s1.stay - 64.06) < 1e-9);
+  const s6 = logic.resolveModeTransition('normalA', 'other', 6);
+  assert.equal(s6.normalB, 39.06);
+  assert.equal(s6.tengoku, 11.72);
+  assert.equal(s6.dokidoki, 0.78);
+  assert.ok(Math.abs(s6.stay - 48.44) < 1e-9);
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'cherry', 1), s1); // cherryはotherにフォールバック
+});
+
+test('normalB rows: fixed chudanCherry/confirmed, ranged suika/other', () => {
+  assert.deepEqual(logic.resolveModeTransition('normalB', 'chudanCherry', 1),
+    { tengoku: 50.00, dokidoki: 49.22, superDokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('normalB', 'confirmed', 1),
+    { stay: 25.00, tengoku: 50.00, dokidoki: 25.00 });
+  const suikaS1 = logic.resolveModeTransition('normalB', 'suika', 1);
+  assert.equal(suikaS1.tengoku, 59.38);
+  assert.equal(suikaS1.dokidoki, 15.63);
+  const suikaS6 = logic.resolveModeTransition('normalB', 'suika', 6);
+  assert.equal(suikaS6.tengoku, 67.97);
+  assert.equal(suikaS6.dokidoki, 20.31);
+});
+
+test('tengoku rows: cherry/chudanCherry/confirmed/suika fixed, other splits by odd/even', () => {
+  assert.deepEqual(logic.resolveModeTransition('tengoku', 'cherry', 1), { stay: 99.22, dokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('tengoku', 'chudanCherry', 1), { dokidoki: 100 });
+  assert.deepEqual(logic.resolveModeTransition('tengoku', 'confirmed', 1), { stay: 93.75, dokidoki: 6.25 });
+  assert.deepEqual(logic.resolveModeTransition('tengoku', 'suika', 1), { stay: 98.44, dokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('tengoku', 'other', 1),
+    { stay: 74.22, hikimodoshi: 7.81, normalA: 13.28, normalB: 3.91, dokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('tengoku', 'other', 2),
+    { stay: 64.84, hikimodoshi: 17.19, normalA: 13.28, normalB: 3.91, dokidoki: 0.78 });
+});
+
+test('dokidoki rows are all fixed', () => {
+  assert.deepEqual(logic.resolveModeTransition('dokidoki', 'chudanCherry', 1), { superDokidoki: 100 });
+  assert.deepEqual(logic.resolveModeTransition('dokidoki', 'confirmed', 1), { stay: 96.88, superDokidoki: 3.13 });
+  assert.deepEqual(logic.resolveModeTransition('dokidoki', 'cherry', 1), { stay: 99.61, superDokidoki: 0.39 });
+  assert.deepEqual(logic.resolveModeTransition('dokidoki', 'suika', 1), { stay: 99.22, superDokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('dokidoki', 'other', 1), { hosho: 17.97, stay: 81.64, superDokidoki: 0.39 });
+});
+
+test('superDokidoki: every rare role stays 100%, other can drop to hosho', () => {
+  for (const role of ['chudanCherry', 'confirmed', 'cherry', 'suika']) {
+    assert.deepEqual(logic.resolveModeTransition('superDokidoki', role, 1), { stay: 100 });
+  }
+  assert.deepEqual(logic.resolveModeTransition('superDokidoki', 'other', 1), { stay: 90.63, hosho: 9.38 });
+});
+
+test('hosho rows are all fixed and setting-independent', () => {
+  assert.deepEqual(logic.resolveModeTransition('hosho', 'other', 1),
+    { normalA: 65.23, normalB: 10.16, hikimodoshi: 20.31, tengoku: 3.91, dokidoki: 0.39 });
+  assert.deepEqual(logic.resolveModeTransition('hosho', 'other', 6),
+    { normalA: 65.23, normalB: 10.16, hikimodoshi: 20.31, tengoku: 3.91, dokidoki: 0.39 });
+});
+
+test('hikimodoshi confirmed sums to exactly 100 with no stay; suika/other ranged and always valid', () => {
+  assert.deepEqual(logic.resolveModeTransition('hikimodoshi', 'confirmed', 1),
+    { normalB: 50.00, tengoku: 45.31, dokidoki: 4.69 });
+  const suikaS1 = logic.resolveModeTransition('hikimodoshi', 'suika', 1);
+  const sumS1 = Object.values(suikaS1).reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(sumS1 - 100) < 1e-6);
+  const suikaS6 = logic.resolveModeTransition('hikimodoshi', 'suika', 6);
+  const sumS6 = Object.values(suikaS6).reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(sumS6 - 100) < 1e-6);
+  assert.equal(suikaS6.stay, undefined); // s6は合計100超のため比例縮小され、stayは付かない
+});
+
+test('chance rows are all fixed', () => {
+  assert.deepEqual(logic.resolveModeTransition('chance', 'chudanCherry', 1),
+    { tengoku: 50.00, dokidoki: 42.19, superDokidoki: 7.81 });
+  assert.deepEqual(logic.resolveModeTransition('chance', 'confirmed', 1),
+    { normalB: 25.00, tengoku: 65.63, dokidoki: 7.03, superDokidoki: 2.34 });
+  assert.deepEqual(logic.resolveModeTransition('chance', 'suika', 1),
+    { normalB: 65.63, tengoku: 31.25, dokidoki: 2.34, superDokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('chance', 'other', 1),
+    { normalB: 82.81, tengoku: 15.63, dokidoki: 1.17, superDokidoki: 0.39 });
+});
+
+test('invariant: every (mode, role, setting) distribution sums to 100', () => {
+  const modes = ['normalA', 'normalB', 'tengoku', 'dokidoki', 'superDokidoki', 'hosho', 'hikimodoshi', 'chance'];
+  const roles = ['chudanCherry', 'confirmed', 'cherry', 'suika', 'other'];
+  for (const mode of modes) {
+    for (const role of roles) {
+      for (let setting = 1; setting <= 6; setting++) {
+        const dist = logic.resolveModeTransition(mode, role, setting);
+        const sum = Object.values(dist).reduce((s, v) => s + v, 0);
+        assert.ok(Math.abs(sum - 100) < 1e-6, `${mode}/${role}/setting${setting} sums to ${sum}`);
+      }
+    }
+  }
+});
