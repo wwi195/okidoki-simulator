@@ -211,7 +211,7 @@ const MODE_TRANSITION_TABLE = {
     cherry: { type: 'fixed', outcomes: { stay: 99.22, dokidoki: 0.78 } },
     chudanCherry: { type: 'fixed', outcomes: { dokidoki: 100 } },
     confirmed: { type: 'fixed', outcomes: { stay: 93.75, dokidoki: 6.25 } },
-    suika: { type: 'fixed', outcomes: { stay: 98.44, dokidoki: 0.78 } },
+    suika: { type: 'fixed', outcomes: { stay: 98.44, dokidoki: 1.56 } },
     other: {
       type: 'oddEven',
       odd: { type: 'fixed', outcomes: { stay: 74.22, hikimodoshi: 7.81, normalA: 13.28, normalB: 3.91, dokidoki: 0.78 } },

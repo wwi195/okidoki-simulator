@@ -222,7 +222,7 @@ test('tengoku rows: cherry/chudanCherry/confirmed/suika fixed, other splits by o
   assert.deepEqual(logic.resolveModeTransition('tengoku', 'cherry', 1), { stay: 99.22, dokidoki: 0.78 });
   assert.deepEqual(logic.resolveModeTransition('tengoku', 'chudanCherry', 1), { dokidoki: 100 });
   assert.deepEqual(logic.resolveModeTransition('tengoku', 'confirmed', 1), { stay: 93.75, dokidoki: 6.25 });
-  assert.deepEqual(logic.resolveModeTransition('tengoku', 'suika', 1), { stay: 98.44, dokidoki: 0.78 });
+  assert.deepEqual(logic.resolveModeTransition('tengoku', 'suika', 1), { stay: 98.44, dokidoki: 1.56 });
   assert.deepEqual(logic.resolveModeTransition('tengoku', 'other', 1),
     { stay: 74.22, hikimodoshi: 7.81, normalA: 13.28, normalB: 3.91, dokidoki: 0.78 });
   assert.deepEqual(logic.resolveModeTransition('tengoku', 'other', 2),
