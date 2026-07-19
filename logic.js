@@ -150,6 +150,15 @@ function rollBonusTrigger(mode, bucket, setting) {
 // 与えられた出現率(%)の合計が100未満なら、残りを「stay」(現モード維持)として補う。
 // 100以上（レンジ補間の誤差で超過した場合）は全項目を比例縮小して合計を100にする。
 // どちらの場合も必ず合計100%の分布を返す。
+//
+// Precondition: `raw` is expected to represent only the "moving" outcomes of a
+// transition row. If `raw` already contains its own `stay` key (e.g. a row that
+// explicitly enumerates a stay percentage as part of an already-100%-summing
+// set), that key participates in the sum like any other — the function's own
+// added-`stay`-remainder branch will never trigger for such a row, since the
+// sum is already ~100. Callers must not pass a `raw` object whose own `stay`
+// key does NOT already reflect the true remainder unless they intend the whole
+// object (including that `stay` value) to be proportionally rescaled.
 function normalizeDistribution(raw) {
   const sum = Object.values(raw).reduce((s, v) => s + v, 0);
   if (sum < 100 - 1e-9) {
@@ -161,6 +170,13 @@ function normalizeDistribution(raw) {
   return result;
 }
 
+// Relies on Object.entries() iteration order, which follows insertion order for
+// string keys — safe for named mode/outcome keys like 'normalA'/'stay'. It is
+// NOT safe if any outcome key were an integer-index string (e.g. '0', '1'):
+// per the JS spec, such keys are reordered to the front regardless of insertion
+// order, which would break the intended cumulative-range walk. Every
+// distribution in this codebase uses named keys, never numeric-string keys, so
+// this is a documented constraint, not a current bug.
 function rollFromDistribution(dist) {
   const r = Math.random() * 100;
   let cum = 0;
