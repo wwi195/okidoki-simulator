@@ -80,6 +80,15 @@ function transitionRole(yaku) {
   return 'other'; // miss/replay/oshijunBell/commonBell/ceiling(天井強制当選)
 }
 
+// ===== 設定間補間カーブ（元データが設定1・6のレンジのみの項目用） =====
+// 偶数設定(2,4,6)は奇数設定に比べてモードアップ率が高いというユーザー確認済みの
+// 特性を、階段状カーブで再現する近似値。実データが揃ったら差し替える。
+const SETTING_POSITION = { 1: 0.00, 2: 0.25, 3: 0.35, 4: 0.65, 5: 0.75, 6: 1.00 };
+
+function interpolateBySetting(min, max, setting) {
+  return min + SETTING_POSITION[setting] * (max - min);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -91,5 +100,7 @@ if (typeof module !== 'undefined' && module.exports) {
     rollYaku,
     triggerBucket,
     transitionRole,
+    SETTING_POSITION,
+    interpolateBySetting,
   };
 }

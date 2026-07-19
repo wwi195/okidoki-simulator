@@ -86,3 +86,14 @@ test('transitionRole keeps chudanCherry and confirmed(kakuteiCherry/kakuteiyaku)
   assert.equal(logic.transitionRole('replay'), 'other');
   assert.equal(logic.transitionRole('ceiling'), 'other'); // 天井強制当選も「上記以外」扱い
 });
+
+test('SETTING_POSITION is the even-favoring stepped curve from 0 to 1', () => {
+  assert.deepEqual(logic.SETTING_POSITION, { 1: 0.00, 2: 0.25, 3: 0.35, 4: 0.65, 5: 0.75, 6: 1.00 });
+});
+
+test('interpolateBySetting maps a [min,max] range through SETTING_POSITION', () => {
+  assert.equal(logic.interpolateBySetting(10, 20, 1), 10);
+  assert.equal(logic.interpolateBySetting(10, 20, 6), 20);
+  assert.equal(logic.interpolateBySetting(10, 20, 2), 10 + 0.25 * 10);
+  assert.equal(logic.interpolateBySetting(10, 20, 4), 10 + 0.65 * 10);
+});
