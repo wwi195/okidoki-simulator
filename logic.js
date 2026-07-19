@@ -146,6 +146,32 @@ function rollBonusTrigger(mode, bucket, setting) {
   return Math.random() < p;
 }
 
+// ===== モード移行抽選表の共通ヘルパー =====
+// 与えられた出現率(%)の合計が100未満なら、残りを「stay」(現モード維持)として補う。
+// 100以上（レンジ補間の誤差で超過した場合）は全項目を比例縮小して合計を100にする。
+// どちらの場合も必ず合計100%の分布を返す。
+function normalizeDistribution(raw) {
+  const sum = Object.values(raw).reduce((s, v) => s + v, 0);
+  if (sum < 100 - 1e-9) {
+    return { ...raw, stay: 100 - sum };
+  }
+  const factor = 100 / sum;
+  const result = {};
+  for (const k in raw) result[k] = raw[k] * factor;
+  return result;
+}
+
+function rollFromDistribution(dist) {
+  const r = Math.random() * 100;
+  let cum = 0;
+  for (const [outcome, pct] of Object.entries(dist)) {
+    cum += pct;
+    if (r < cum) return outcome;
+  }
+  const keys = Object.keys(dist);
+  return keys[keys.length - 1];
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -164,5 +190,7 @@ if (typeof module !== 'undefined' && module.exports) {
     modeGroupKey,
     MODE_WIN_RATE_RANGES,
     rollBonusTrigger,
+    normalizeDistribution,
+    rollFromDistribution,
   };
 }

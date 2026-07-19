@@ -146,3 +146,29 @@ test('rollBonusTrigger: other/cherry/suika buckets roll against the interpolated
   assert.equal(withMockRandom([0], () => logic.rollBonusTrigger('normalA', 'cherry', 1)), true);
   assert.equal(withMockRandom([p + 0.0001], () => logic.rollBonusTrigger('normalA', 'cherry', 1)), false);
 });
+
+test('normalizeDistribution adds a stay remainder when outcomes sum under 100', () => {
+  const result = logic.normalizeDistribution({ a: 30, b: 20 });
+  assert.equal(result.a, 30);
+  assert.equal(result.b, 20);
+  assert.equal(result.stay, 50);
+});
+
+test('normalizeDistribution proportionally scales down when outcomes sum to exactly 100 or more', () => {
+  const exact = logic.normalizeDistribution({ a: 60, b: 40 });
+  assert.equal(exact.a, 60);
+  assert.equal(exact.b, 40);
+  assert.equal(exact.stay, undefined);
+
+  const over = logic.normalizeDistribution({ a: 60, b: 60 });
+  assert.equal(over.a, 50);
+  assert.equal(over.b, 50);
+  assert.equal(over.stay, undefined);
+});
+
+test('rollFromDistribution picks the outcome whose cumulative range contains the draw', () => {
+  const dist = { a: 30, b: 20, stay: 50 };
+  assert.equal(withMockRandom([0], () => logic.rollFromDistribution(dist)), 'a');
+  assert.equal(withMockRandom([0.35], () => logic.rollFromDistribution(dist)), 'b');
+  assert.equal(withMockRandom([0.99], () => logic.rollFromDistribution(dist)), 'stay');
+});
