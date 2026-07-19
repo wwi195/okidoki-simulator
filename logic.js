@@ -37,6 +37,46 @@ const KOYAKU_PAYOUT = {
   chudanCherry: 1,
 };
 
+// 1G分の成立役抽選（BIG/REG自体はここでは決めない。契機役の判定のみ）
+const YAKU_ORDER = [
+  'replay', 'oshijunBell', 'commonBell', 'cherry', 'suika',
+  'kakuteiyaku', 'kakuteiCherry', 'chudanCherry',
+];
+
+function yakuProb(key, setting) {
+  if (key === 'commonBell') return COMMON_BELL_PROB[setting];
+  return KOYAKU_PROB[key];
+}
+
+function rollYaku(setting) {
+  const r = Math.random();
+  let cum = 0;
+  for (const key of YAKU_ORDER) {
+    cum += yakuProb(key, setting);
+    if (r < cum) return key;
+  }
+  return 'miss';
+}
+
+// 契機役 → ボーナス抽選バケット（当選率テーブル参照用）
+const CONFIRMED_YAKU = new Set(['chudanCherry', 'kakuteiCherry', 'kakuteiyaku']);
+
+function triggerBucket(yaku) {
+  if (CONFIRMED_YAKU.has(yaku)) return 'confirmed';
+  if (yaku === 'cherry') return 'cherry';
+  if (yaku === 'suika') return 'suika';
+  return 'other';
+}
+
+// 契機役 → モード移行抽選表の行キー（chudanCherryとconfirmedを区別する）
+function transitionRole(yaku) {
+  if (yaku === 'chudanCherry') return 'chudanCherry';
+  if (yaku === 'kakuteiCherry' || yaku === 'kakuteiyaku') return 'confirmed';
+  if (yaku === 'cherry') return 'cherry';
+  if (yaku === 'suika') return 'suika';
+  return 'other'; // miss/replay/oshijunBell/commonBell/ceiling(天井強制当選)
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -45,5 +85,8 @@ if (typeof module !== 'undefined' && module.exports) {
     KOYAKU_PROB,
     COMMON_BELL_PROB,
     KOYAKU_PAYOUT,
+    rollYaku,
+    triggerBucket,
+    transitionRole,
   };
 }

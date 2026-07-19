@@ -52,3 +52,32 @@ test('KOYAKU_PAYOUT has payout medals for each paying small role', () => {
   assert.equal(logic.KOYAKU_PAYOUT.kakuteiCherry, 1);
   assert.equal(logic.KOYAKU_PAYOUT.chudanCherry, 1);
 });
+
+test('rollYaku picks the role whose cumulative probability range contains the draw', () => {
+  // cumulative thresholds at setting 1, in table order:
+  // replay < replay+oshijunBell < +commonBell(s1) < +cherry < +suika < +kakuteiyaku < +kakuteiCherry < +chudanCherry < miss
+  assert.equal(withMockRandom([0], () => logic.rollYaku(1)), 'replay');
+  assert.equal(withMockRandom([0.99999], () => logic.rollYaku(1)), 'miss');
+});
+
+test('triggerBucket classifies confirmed-BIG roles, cherry, suika, and everything else', () => {
+  assert.equal(logic.triggerBucket('chudanCherry'), 'confirmed');
+  assert.equal(logic.triggerBucket('kakuteiCherry'), 'confirmed');
+  assert.equal(logic.triggerBucket('kakuteiyaku'), 'confirmed');
+  assert.equal(logic.triggerBucket('cherry'), 'cherry');
+  assert.equal(logic.triggerBucket('suika'), 'suika');
+  assert.equal(logic.triggerBucket('replay'), 'other');
+  assert.equal(logic.triggerBucket('oshijunBell'), 'other');
+  assert.equal(logic.triggerBucket('commonBell'), 'other');
+  assert.equal(logic.triggerBucket('miss'), 'other');
+});
+
+test('transitionRole keeps chudanCherry and confirmed(kakuteiCherry/kakuteiyaku) separate', () => {
+  assert.equal(logic.transitionRole('chudanCherry'), 'chudanCherry');
+  assert.equal(logic.transitionRole('kakuteiCherry'), 'confirmed');
+  assert.equal(logic.transitionRole('kakuteiyaku'), 'confirmed');
+  assert.equal(logic.transitionRole('cherry'), 'cherry');
+  assert.equal(logic.transitionRole('suika'), 'suika');
+  assert.equal(logic.transitionRole('replay'), 'other');
+  assert.equal(logic.transitionRole('ceiling'), 'other'); // 天井強制当選も「上記以外」扱い
+});
