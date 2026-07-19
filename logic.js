@@ -107,6 +107,45 @@ function rollBigOrReg(setting) {
   return Math.random() < bigShare ? 'big' : 'reg';
 }
 
+// ===== モード滞在中のボーナス当選率（グループ別レンジ、確率0-1で統一） =====
+function modeGroupKey(mode) {
+  if (mode === 'normalA' || mode === 'normalB') return 'normalAB';
+  if (mode === 'hikimodoshi') return 'hikimodoshi';
+  if (mode === 'chance') return 'chance';
+  return 'heavenGroup'; // hosho, tengoku, dokidoki, superDokidoki
+}
+
+const MODE_WIN_RATE_RANGES = {
+  normalAB: {
+    other: [1 / 297.89, 1 / 234.06],
+    cherry: [0.0092, 0.0168],
+    suika: [0.0366, 0.0519],
+  },
+  hikimodoshi: {
+    other: [1 / 119.16, 1 / 93.62],
+    cherry: [0.0229, 0.0420],
+    suika: [0.0916, 0.1297],
+  },
+  chance: {
+    other: [1 / 99.30, 1 / 78.02],
+    cherry: [0.0275, 0.0504],
+    suika: [0.1099, 0.1556],
+  },
+  heavenGroup: {
+    other: [1 / 8.19, 1 / 8.19], // 全設定共通
+    cherry: [0.0625, 0.0816],
+    suika: [0.2500, 0.3263],
+  },
+};
+
+// bucket: 'confirmed' | 'cherry' | 'suika' | 'other'（triggerBucket()の戻り値）
+function rollBonusTrigger(mode, bucket, setting) {
+  if (bucket === 'confirmed') return true; // 中段チェリー・確定チェリー・確定役はBIG確定
+  const [min, max] = MODE_WIN_RATE_RANGES[modeGroupKey(mode)][bucket];
+  const p = interpolateBySetting(min, max, setting);
+  return Math.random() < p;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -122,5 +161,8 @@ if (typeof module !== 'undefined' && module.exports) {
     interpolateBySetting,
     BONUS_PROB_TABLE,
     rollBigOrReg,
+    modeGroupKey,
+    MODE_WIN_RATE_RANGES,
+    rollBonusTrigger,
   };
 }

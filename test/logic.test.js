@@ -110,3 +110,35 @@ test('rollBigOrReg splits by each setting\'s base BIG:REG probability ratio', ()
   assert.equal(withMockRandom([0], () => logic.rollBigOrReg(1)), 'big');
   assert.equal(withMockRandom([bigShare1 + 0.001], () => logic.rollBigOrReg(1)), 'reg');
 });
+
+test('modeGroupKey maps the 8 internal modes to their 4 win-rate groups', () => {
+  assert.equal(logic.modeGroupKey('normalA'), 'normalAB');
+  assert.equal(logic.modeGroupKey('normalB'), 'normalAB');
+  assert.equal(logic.modeGroupKey('hikimodoshi'), 'hikimodoshi');
+  assert.equal(logic.modeGroupKey('chance'), 'chance');
+  assert.equal(logic.modeGroupKey('hosho'), 'heavenGroup');
+  assert.equal(logic.modeGroupKey('tengoku'), 'heavenGroup');
+  assert.equal(logic.modeGroupKey('dokidoki'), 'heavenGroup');
+  assert.equal(logic.modeGroupKey('superDokidoki'), 'heavenGroup');
+});
+
+test('MODE_WIN_RATE_RANGES has the 4 groups with other/cherry/suika ranges as probabilities (0-1)', () => {
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.other, [1 / 297.89, 1 / 234.06]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.cherry, [0.0092, 0.0168]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.suika, [0.0366, 0.0519]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.hikimodoshi.other, [1 / 119.16, 1 / 93.62]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.chance.other, [1 / 99.30, 1 / 78.02]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.other, [1 / 8.19, 1 / 8.19]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.cherry, [0.0625, 0.0816]);
+  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.suika, [0.2500, 0.3263]);
+});
+
+test('rollBonusTrigger: confirmed bucket always wins regardless of roll', () => {
+  assert.equal(withMockRandom([0.999999], () => logic.rollBonusTrigger('normalA', 'confirmed', 1)), true);
+});
+
+test('rollBonusTrigger: other/cherry/suika buckets roll against the interpolated group rate', () => {
+  const p = logic.interpolateBySetting(...logic.MODE_WIN_RATE_RANGES.normalAB.cherry, 1);
+  assert.equal(withMockRandom([0], () => logic.rollBonusTrigger('normalA', 'cherry', 1)), true);
+  assert.equal(withMockRandom([p + 0.0001], () => logic.rollBonusTrigger('normalA', 'cherry', 1)), false);
+});
