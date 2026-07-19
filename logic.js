@@ -89,6 +89,24 @@ function interpolateBySetting(min, max, setting) {
   return min + SETTING_POSITION[setting] * (max - min);
 }
 
+// ===== ボーナス基礎確率（設定別） =====
+const BONUS_PROB_TABLE = {
+  1: { big: 1 / 394.1, reg: 1 / 632.1 },
+  2: { big: 1 / 377.0, reg: 1 / 584.8 },
+  3: { big: 1 / 362.4, reg: 1 / 546.2 },
+  4: { big: 1 / 347.6, reg: 1 / 510.5 },
+  5: { big: 1 / 334.7, reg: 1 / 479.6 },
+  6: { big: 1 / 322.6, reg: 1 / 452.1 },
+};
+
+// 天井到達・「上記以外」契機など、BIG/REGどちらか未確定のボーナス当選時に
+// 設定別の基礎確率比率で振り分ける
+function rollBigOrReg(setting) {
+  const { big, reg } = BONUS_PROB_TABLE[setting];
+  const bigShare = big / (big + reg);
+  return Math.random() < bigShare ? 'big' : 'reg';
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -102,5 +120,7 @@ if (typeof module !== 'undefined' && module.exports) {
     transitionRole,
     SETTING_POSITION,
     interpolateBySetting,
+    BONUS_PROB_TABLE,
+    rollBigOrReg,
   };
 }

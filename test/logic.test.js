@@ -97,3 +97,16 @@ test('interpolateBySetting maps a [min,max] range through SETTING_POSITION', () 
   assert.equal(logic.interpolateBySetting(10, 20, 2), 10 + 0.25 * 10);
   assert.equal(logic.interpolateBySetting(10, 20, 4), 10 + 0.65 * 10);
 });
+
+test('BONUS_PROB_TABLE has BIG/REG base probability per setting', () => {
+  assert.equal(logic.BONUS_PROB_TABLE[1].big, 1 / 394.1);
+  assert.equal(logic.BONUS_PROB_TABLE[1].reg, 1 / 632.1);
+  assert.equal(logic.BONUS_PROB_TABLE[6].big, 1 / 322.6);
+  assert.equal(logic.BONUS_PROB_TABLE[6].reg, 1 / 452.1);
+});
+
+test('rollBigOrReg splits by each setting\'s base BIG:REG probability ratio', () => {
+  const bigShare1 = (1 / 394.1) / (1 / 394.1 + 1 / 632.1);
+  assert.equal(withMockRandom([0], () => logic.rollBigOrReg(1)), 'big');
+  assert.equal(withMockRandom([bigShare1 + 0.001], () => logic.rollBigOrReg(1)), 'reg');
+});
