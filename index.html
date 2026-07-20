@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>オキドキ シミュレーター</title>
+<title>沖ドキ シミュレーター</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -121,7 +121,7 @@
 </head>
 <body>
 
-<h1>🌺 オキドキ シミュレーター 🌺</h1>
+<h1>🌺 初代沖ドキ シミュレーター 🌺</h1>
 
 <div class="panel">
   <div class="row">
@@ -217,6 +217,17 @@ const YAKU_ICONS = {
   missPayout: '－',
 };
 
+const MODE_LABELS = {
+  normalA: 'ノーマルA',
+  normalB: 'ノーマルB',
+  chance: 'チャンス',
+  hikimodoshi: '引き戻し',
+  tengoku: '天国',
+  dokidoki: 'ドキドキ',
+  superDokidoki: '超ドキ',
+  hosho: '保証',
+};
+
 let state = null;
 let bigCount = 0;
 let regCount = 0;
@@ -236,7 +247,7 @@ function currentSetting() {
 
 function renderStatus() {
   const el = document.getElementById('status');
-  el.innerHTML = `モード: <b>${state.mode}</b> / 差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, CEILING_GAMES[state.mode] - state.gamesSinceLastBonus)}</b>`;
+  el.innerHTML = `モード: <b>${MODE_LABELS[state.mode] || state.mode}</b> / 差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, CEILING_GAMES[state.mode] - state.gamesSinceLastBonus)}</b>`;
 }
 
 function renderPlayScreen() {
