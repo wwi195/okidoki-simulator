@@ -342,6 +342,58 @@ function resolveBonusPayout(type) {
   return { games, netMedals: games * netMedalsPerGame };
 }
 
+// ===== ゲームループ =====
+const BET_MEDALS = 3; // 1Gあたりの賭け枚数
+
+// リセット・設定変更時の初期モード振分け（全設定共通）
+const RESET_MODE_DISTRIBUTION = { normalA: 57.03, normalB: 9.77, chance: 33.20 };
+
+function rollResetMode() {
+  return rollFromDistribution(RESET_MODE_DISTRIBUTION);
+}
+
+// state: { mode, medals, games }
+// 戻り値: { state: 更新後state, bonus: null | 'big' | 'reg' }
+function playGame(state, setting) {
+  const yaku = rollYaku(setting);
+  const spinNet = yaku === 'replay' ? 0 : (KOYAKU_PAYOUT[yaku] || 0) - BET_MEDALS;
+
+  let medals = state.medals + spinNet;
+  let games = state.games + 1;
+  let mode = state.mode;
+  let bonus = null;
+
+  const bucket = triggerBucket(yaku);
+  if (rollBonusTrigger(state.mode, bucket, setting)) {
+    const type = rollBigOrReg(setting);
+    const payout = resolveBonusPayout(type);
+    medals += payout.netMedals;
+    games += payout.games;
+    bonus = type;
+
+    const role = transitionRole(yaku);
+    const dist = resolveModeTransition(state.mode, role, setting);
+    const outcome = rollFromDistribution(dist);
+    mode = outcome === 'stay' ? state.mode : outcome;
+  }
+
+  return { state: { mode, medals, games }, bonus };
+}
+
+// initialState: { mode, medals, games }。totalGames到達までplayGameを繰り返す
+// （ボーナス消化G込みの累計のため、最終gamesはtotalGamesを超えうる）
+function simulate(setting, initialState, totalGames) {
+  let state = initialState;
+  const stats = { bigCount: 0, regCount: 0 };
+  while (state.games < totalGames) {
+    const result = playGame(state, setting);
+    state = result.state;
+    if (result.bonus === 'big') stats.bigCount++;
+    if (result.bonus === 'reg') stats.regCount++;
+  }
+  return { state, stats };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -366,5 +418,10 @@ if (typeof module !== 'undefined' && module.exports) {
     resolveModeTransition,
     BONUS_PAYOUT_TABLE,
     resolveBonusPayout,
+    BET_MEDALS,
+    RESET_MODE_DISTRIBUTION,
+    rollResetMode,
+    playGame,
+    simulate,
   };
 }

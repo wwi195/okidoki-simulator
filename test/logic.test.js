@@ -305,3 +305,57 @@ test('resolveBonusPayout returns games and total net medals for BIG', () => {
 test('resolveBonusPayout returns games and total net medals for REG', () => {
   assert.deepEqual(logic.resolveBonusPayout('reg'), { games: 30, netMedals: 90 });
 });
+
+test('BET_MEDALS is 3 medals per game', () => {
+  assert.equal(logic.BET_MEDALS, 3);
+});
+
+test('RESET_MODE_DISTRIBUTION is setting-independent: normalA/normalB/chance', () => {
+  assert.deepEqual(logic.RESET_MODE_DISTRIBUTION, { normalA: 57.03, normalB: 9.77, chance: 33.20 });
+});
+
+test('rollResetMode picks a starting mode from RESET_MODE_DISTRIBUTION', () => {
+  assert.equal(withMockRandom([0], () => logic.rollResetMode()), 'normalA');
+  assert.equal(withMockRandom([0.99999], () => logic.rollResetMode()), 'chance');
+});
+
+test('playGame: replay costs no medals and no bet (net 0), mode unchanged, no bonus', () => {
+  const state = { mode: 'normalA', medals: 0, games: 0 };
+  // r1=0 -> rollYaku(1) = 'replay'; r2 high -> rollBonusTrigger('normalA','other',1) = false
+  const result = withMockRandom([0, 0.999999], () => logic.playGame(state, 1));
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 0, games: 1 });
+  assert.equal(result.bonus, null);
+});
+
+test('playGame: a miss costs the full bet (net -BET_MEDALS), no bonus', () => {
+  const state = { mode: 'normalA', medals: 100, games: 5 };
+  // r1=0.99999 -> rollYaku(1) = 'miss'; r2 high -> rollBonusTrigger('normalA','other',1) = false
+  const result = withMockRandom([0.99999, 0.999999], () => logic.playGame(state, 1));
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 97, games: 6 });
+  assert.equal(result.bonus, null);
+});
+
+test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mode transition in one call', () => {
+  const state = { mode: 'normalA', medals: 0, games: 0 };
+  const cumBeforeKakuteiyaku = logic.KOYAKU_PROB.replay + logic.KOYAKU_PROB.oshijunBell
+    + logic.COMMON_BELL_PROB[1] + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika;
+  // r1 -> rollYaku(1) = 'kakuteiyaku' (confirmed bucket, rollBonusTrigger consumes no random)
+  // r2=0 -> rollBigOrReg(1) = 'big'
+  // r3=0 -> rollFromDistribution({stay:45.31, normalB:25, tengoku:25, dokidoki:4.69}) = 'stay'
+  const result = withMockRandom([cumBeforeKakuteiyaku + 0.0000001, 0, 0], () => logic.playGame(state, 1));
+  // trigger spin: payout 1 - BET_MEDALS(3) = -2; bonus: 70 games, +210 medals
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 208, games: 71 });
+  assert.equal(result.bonus, 'big');
+});
+
+test('simulate: runs playGame until the cumulative game count reaches totalGames, tallying BIG/REG', () => {
+  const initialState = { mode: 'normalA', medals: 0, games: 0 };
+  // r1=0 -> rollYaku(1)='replay'; r2 high -> no bonus (games: 0->1)
+  // r3=0.99999 -> rollYaku(1)='miss'; r4 high -> no bonus (games: 1->2, medals: 0-3=-3)
+  const result = withMockRandom(
+    [0, 0.999999, 0.99999, 0.999999],
+    () => logic.simulate(1, initialState, 2)
+  );
+  assert.deepEqual(result.state, { mode: 'normalA', medals: -3, games: 2 });
+  assert.deepEqual(result.stats, { bigCount: 0, regCount: 0 });
+});
