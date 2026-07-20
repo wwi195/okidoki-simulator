@@ -193,7 +193,7 @@
 
 const YAKU_LABELS = {
   replay: '🔄 リプレイ',
-  oshijunBell: '🔔 ベル',
+  firstBell: '🔔 ベル(取りこぼし)',
   commonBell: '🔔 ベル',
   cherry: '🍒 チェリー',
   suika: '🍉 スイカ',
@@ -295,10 +295,11 @@ function handleSpinResult(result) {
   const before = state.medals;
   state = result.state;
   const net = state.medals - before;
+  const style = net > 0 ? 'win' : net === 0 ? '' : 'miss';
   const wd = document.getElementById('winDisplay');
   wd.textContent = `${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`;
-  wd.className = 'win-display ' + (result.yaku === 'miss' ? 'miss' : result.yaku === 'replay' ? '' : 'win');
-  addLog(`${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`, result.yaku === 'miss' ? 'log-miss' : result.yaku === 'replay' ? 'log-replay' : 'log-win');
+  wd.className = 'win-display ' + style;
+  addLog(`${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`, style === 'miss' ? 'log-miss' : style === '' ? 'log-replay' : 'log-win');
 
   renderStatus();
   renderPlayScreen();
@@ -344,6 +345,7 @@ document.getElementById('judgeBtn').addEventListener('click', () => {
   if (!pendingResult) return;
 
   const { bonus } = pendingResult;
+  const hitG = state.gamesSinceLastBonus + 1; // このスピンでボーナス間G数がリセットされる前の値
   if (bonus === 'big') bigCount++; else regCount++;
   state = pendingResult.state;
   pendingResult = null;
@@ -352,7 +354,7 @@ document.getElementById('judgeBtn').addEventListener('click', () => {
   const label = bonus === 'big' ? '🎰 BIG BONUS!!' : '🎰 REG BONUS!!';
   wd.textContent = label;
   wd.className = 'win-display ' + bonus;
-  addLog(label, bonus === 'big' ? 'log-big' : 'log-reg');
+  addLog(label, bonus === 'big' ? 'log-big' : 'log-reg', hitG);
 
   renderStatus();
   renderPlayScreen();
@@ -381,11 +383,12 @@ document.getElementById('cashOutBtn').addEventListener('click', () => {
   renderPlayScreen();
 });
 
-function addLog(msg, cls) {
+function addLog(msg, cls, gCountOverride) {
   const log = document.getElementById('log');
   const div = document.createElement('div');
   div.className = cls;
-  div.textContent = `G${state.games}: ${msg}`;
+  const gCount = gCountOverride !== undefined ? gCountOverride : state.gamesSinceLastBonus;
+  div.textContent = `${gCount}G: ${msg}`;
   log.appendChild(div);
   while (log.children.length > 500) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
