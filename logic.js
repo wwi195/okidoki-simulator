@@ -352,7 +352,14 @@ function rollResetMode() {
   return rollFromDistribution(RESET_MODE_DISTRIBUTION);
 }
 
-// state: { mode, medals, games }
+// ボーナス非当選が続いた場合の強制当選しきい値（モード別、全設定共通）
+const CEILING_GAMES = {
+  normalA: 1000, normalB: 1000,
+  hikimodoshi: 200, chance: 200,
+  hosho: 32, tengoku: 32, dokidoki: 32, superDokidoki: 32,
+};
+
+// state: { mode, medals, games, gamesSinceLastBonus }
 // 戻り値: { state: 更新後state, bonus: null | 'big' | 'reg' }
 function playGame(state, setting) {
   const yaku = rollYaku(setting);
@@ -361,23 +368,28 @@ function playGame(state, setting) {
   let medals = state.medals + spinNet;
   let games = state.games + 1;
   let mode = state.mode;
+  let gamesSinceLastBonus = state.gamesSinceLastBonus + 1;
   let bonus = null;
 
   const bucket = triggerBucket(yaku);
-  if (rollBonusTrigger(state.mode, bucket, setting)) {
+  const naturalWin = rollBonusTrigger(state.mode, bucket, setting);
+  const ceilingWin = !naturalWin && gamesSinceLastBonus >= CEILING_GAMES[state.mode];
+
+  if (naturalWin || ceilingWin) {
     const type = rollBigOrReg(setting);
     const payout = resolveBonusPayout(type);
     medals += payout.netMedals;
     games += payout.games;
     bonus = type;
+    gamesSinceLastBonus = 0;
 
-    const role = transitionRole(yaku);
+    const role = naturalWin ? transitionRole(yaku) : transitionRole('ceiling');
     const dist = resolveModeTransition(state.mode, role, setting);
     const outcome = rollFromDistribution(dist);
     mode = outcome === 'stay' ? state.mode : outcome;
   }
 
-  return { state: { mode, medals, games }, bonus };
+  return { state: { mode, medals, games, gamesSinceLastBonus }, bonus };
 }
 
 // initialState: { mode, medals, games }。totalGames到達までplayGameを繰り返す
@@ -421,6 +433,7 @@ if (typeof module !== 'undefined' && module.exports) {
     BET_MEDALS,
     RESET_MODE_DISTRIBUTION,
     rollResetMode,
+    CEILING_GAMES,
     playGame,
     simulate,
   };

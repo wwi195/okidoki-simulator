@@ -320,23 +320,23 @@ test('rollResetMode picks a starting mode from RESET_MODE_DISTRIBUTION', () => {
 });
 
 test('playGame: replay costs no medals and no bet (net 0), mode unchanged, no bonus', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
   // r1=0 -> rollYaku(1) = 'replay'; r2 high -> rollBonusTrigger('normalA','other',1) = false
   const result = withMockRandom([0, 0.999999], () => logic.playGame(state, 1));
-  assert.deepEqual(result.state, { mode: 'normalA', medals: 0, games: 1 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 0, games: 1, gamesSinceLastBonus: 1 });
   assert.equal(result.bonus, null);
 });
 
 test('playGame: a miss costs the full bet (net -BET_MEDALS), no bonus', () => {
-  const state = { mode: 'normalA', medals: 100, games: 5 };
+  const state = { mode: 'normalA', medals: 100, games: 5, gamesSinceLastBonus: 10 };
   // r1=0.99999 -> rollYaku(1) = 'miss'; r2 high -> rollBonusTrigger('normalA','other',1) = false
   const result = withMockRandom([0.99999, 0.999999], () => logic.playGame(state, 1));
-  assert.deepEqual(result.state, { mode: 'normalA', medals: 97, games: 6 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 97, games: 6, gamesSinceLastBonus: 11 });
   assert.equal(result.bonus, null);
 });
 
 test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mode transition in one call', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 50 };
   const cumBeforeKakuteiyaku = logic.KOYAKU_PROB.replay + logic.KOYAKU_PROB.oshijunBell
     + logic.COMMON_BELL_PROB[1] + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika;
   // r1 -> rollYaku(1) = 'kakuteiyaku' (confirmed bucket, rollBonusTrigger consumes no random)
@@ -344,18 +344,37 @@ test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mod
   // r3=0 -> rollFromDistribution({stay:45.31, normalB:25, tengoku:25, dokidoki:4.69}) = 'stay'
   const result = withMockRandom([cumBeforeKakuteiyaku + 0.0000001, 0, 0], () => logic.playGame(state, 1));
   // trigger spin: payout 1 - BET_MEDALS(3) = -2; bonus: 70 games, +210 medals
-  assert.deepEqual(result.state, { mode: 'normalA', medals: 208, games: 71 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 208, games: 71, gamesSinceLastBonus: 0 });
   assert.equal(result.bonus, 'big');
 });
 
+test('CEILING_GAMES has per-mode forced-win thresholds (setting-independent)', () => {
+  assert.deepEqual(logic.CEILING_GAMES, {
+    normalA: 1000, normalB: 1000,
+    hikimodoshi: 200, chance: 200,
+    hosho: 32, tengoku: 32, dokidoki: 32, superDokidoki: 32,
+  });
+});
+
+test('playGame: reaching the mode ceiling forces a win even when the natural roll misses', () => {
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 999 };
+  // r1=0.99999 -> rollYaku(1) = 'miss'; r2 high -> natural rollBonusTrigger = false
+  // gamesSinceLastBonus becomes 1000 === CEILING_GAMES.normalA -> forced win
+  // r3=0 -> rollBigOrReg(1) = 'big'
+  // r4=0 -> rollFromDistribution(normalA.other dist, setting1) = first key ('dokidoki')
+  const result = withMockRandom([0.99999, 0.999999, 0, 0], () => logic.playGame(state, 1));
+  assert.equal(result.bonus, 'big');
+  assert.deepEqual(result.state, { mode: 'dokidoki', medals: -3 + 210, games: 1 + 70, gamesSinceLastBonus: 0 });
+});
+
 test('simulate: runs playGame until the cumulative game count reaches totalGames, tallying BIG/REG', () => {
-  const initialState = { mode: 'normalA', medals: 0, games: 0 };
+  const initialState = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
   // r1=0 -> rollYaku(1)='replay'; r2 high -> no bonus (games: 0->1)
   // r3=0.99999 -> rollYaku(1)='miss'; r4 high -> no bonus (games: 1->2, medals: 0-3=-3)
   const result = withMockRandom(
     [0, 0.999999, 0.99999, 0.999999],
     () => logic.simulate(1, initialState, 2)
   );
-  assert.deepEqual(result.state, { mode: 'normalA', medals: -3, games: 2 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: -3, games: 2, gamesSinceLastBonus: 2 });
   assert.deepEqual(result.stats, { bigCount: 0, regCount: 0 });
 });
