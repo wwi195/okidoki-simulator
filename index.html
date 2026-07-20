@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>オキドキ シミュレーター</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: #1b1d24;
+    color: #eee;
+    margin: 0;
+    padding: 16px;
+  }
+  h1 { font-size: 1.2rem; margin: 0 0 12px; }
+  .panel {
+    background: #262933;
+    border-radius: 8px;
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+  label { font-size: 0.85rem; color: #aab; }
+  select, input[type="number"] {
+    background: #1b1d24;
+    color: #eee;
+    border: 1px solid #444a5a;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+  }
+  button {
+    background: #4a6cf7;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  button:hover { background: #5c7cff; }
+  button.secondary { background: #3a3f4d; }
+  button.secondary:hover { background: #4a4f5d; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tab-btn {
+    background: #262933;
+    color: #aab;
+    border: 1px solid #444a5a;
+    border-radius: 4px 4px 0 0;
+    padding: 6px 14px;
+  }
+  .tab-btn.active { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .status { font-size: 0.85rem; color: #aab; margin-bottom: 10px; }
+  .status b { color: #eee; }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; }
+  .stat { min-width: 100px; }
+  .stat .value { font-size: 1.3rem; font-weight: bold; }
+  .stat .label { font-size: 0.75rem; color: #aab; }
+  svg#slumpGraph { width: 100%; height: 220px; background: #1b1d24; border-radius: 4px; }
+  #log {
+    font-family: "SF Mono", Consolas, monospace;
+    font-size: 0.8rem;
+    background: #1b1d24;
+    border-radius: 4px;
+    padding: 8px;
+    height: 320px;
+    overflow-y: auto;
+    white-space: pre;
+  }
+  #log div { padding: 1px 0; }
+  #log div.bonus-big { color: #ff6b6b; }
+  #log div.bonus-reg { color: #ffd166; }
+</style>
+</head>
+<body>
+
+<h1>オキドキ シミュレーター</h1>
+
+<div class="panel">
+  <div class="row">
+    <label for="setting">設定</label>
+    <select id="setting">
+      <option value="1">設定1</option>
+      <option value="2">設定2</option>
+      <option value="3">設定3</option>
+      <option value="4">設定4</option>
+      <option value="5">設定5</option>
+      <option value="6">設定6</option>
+    </select>
+    <button class="secondary" id="resetBtn">リセット（設定変更）</button>
+  </div>
+  <div class="status" id="status"></div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="batch">一括実行</button>
+  <button class="tab-btn" data-tab="viewer">1Gビューアー</button>
+</div>
+
+<div class="tab-panel active panel" id="tab-batch">
+  <div class="row">
+    <label for="totalGames">総ゲーム数</label>
+    <input type="number" id="totalGames" value="6000" min="1" step="100">
+    <button id="runBtn">実行</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="value" id="statBig">-</div><div class="label">BIG回数</div></div>
+    <div class="stat"><div class="value" id="statReg">-</div><div class="label">REG回数</div></div>
+    <div class="stat"><div class="value" id="statMedals">-</div><div class="label">最終差枚</div></div>
+    <div class="stat"><div class="value" id="statGames">-</div><div class="label">消化G数</div></div>
+  </div>
+  <svg id="slumpGraph" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
+</div>
+
+<div class="tab-panel panel" id="tab-viewer">
+  <div class="row">
+    <button id="spinBtn">スピン</button>
+    <button class="secondary" id="clearLogBtn">ログクリア</button>
+  </div>
+  <div id="log"></div>
+</div>
+
+<script src="logic.js"></script>
+<script>
+'use strict';
+
+let state = null;
+
+function initState() {
+  const setting = Number(document.getElementById('setting').value);
+  state = { mode: rollResetMode(), medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  renderStatus();
+  return setting;
+}
+
+function currentSetting() {
+  return Number(document.getElementById('setting').value);
+}
+
+function renderStatus() {
+  const el = document.getElementById('status');
+  el.innerHTML = `モード: <b>${state.mode}</b> / 差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, CEILING_GAMES[state.mode] - state.gamesSinceLastBonus)}</b>`;
+}
+
+// ===== タブ切り替え =====
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach((p) => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ===== リセット =====
+function resetAll() {
+  initState();
+  document.getElementById('log').innerHTML = '';
+  clearGraph();
+  document.getElementById('statBig').textContent = '-';
+  document.getElementById('statReg').textContent = '-';
+  document.getElementById('statMedals').textContent = '-';
+  document.getElementById('statGames').textContent = '-';
+}
+
+document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+// ===== 1Gビューアー =====
+document.getElementById('spinBtn').addEventListener('click', () => {
+  const setting = currentSetting();
+  const result = playGame(state, setting);
+  state = result.state;
+  renderStatus();
+  appendLog(result);
+});
+
+document.getElementById('clearLogBtn').addEventListener('click', () => {
+  document.getElementById('log').innerHTML = '';
+});
+
+function appendLog(result) {
+  const log = document.getElementById('log');
+  const line = document.createElement('div');
+  const bonusText = result.bonus ? ` → ${result.bonus.toUpperCase()}当選！` : '';
+  line.textContent = `G${result.state.games}: モード=${result.state.mode} 差枚=${result.state.medals}${bonusText}`;
+  if (result.bonus === 'big') line.className = 'bonus-big';
+  if (result.bonus === 'reg') line.className = 'bonus-reg';
+  log.appendChild(line);
+  while (log.children.length > 500) log.removeChild(log.firstChild);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ===== 一括実行 =====
+document.getElementById('runBtn').addEventListener('click', () => {
+  const setting = currentSetting();
+  const totalGames = Number(document.getElementById('totalGames').value);
+  let bigCount = 0;
+  let regCount = 0;
+  const history = [{ games: state.games, medals: state.medals }];
+
+  while (state.games < totalGames) {
+    const result = playGame(state, setting);
+    state = result.state;
+    if (result.bonus === 'big') bigCount++;
+    if (result.bonus === 'reg') regCount++;
+    history.push({ games: state.games, medals: state.medals });
+  }
+
+  renderStatus();
+  document.getElementById('statBig').textContent = bigCount;
+  document.getElementById('statReg').textContent = regCount;
+  document.getElementById('statMedals').textContent = state.medals;
+  document.getElementById('statGames').textContent = state.games;
+  drawSlumpGraph(history);
+});
+
+function clearGraph() {
+  document.getElementById('slumpGraph').innerHTML = '';
+}
+
+function drawSlumpGraph(history) {
+  const svg = document.getElementById('slumpGraph');
+  svg.innerHTML = '';
+  if (history.length < 2) return;
+
+  const w = 600, h = 220, pad = 4;
+  const maxGames = history[history.length - 1].games || 1;
+  const medalValues = history.map((p) => p.medals);
+  const minM = Math.min(0, ...medalValues);
+  const maxM = Math.max(0, ...medalValues);
+  const range = (maxM - minM) || 1;
+
+  const x = (g) => pad + (g / maxGames) * (w - pad * 2);
+  const y = (m) => h - pad - ((m - minM) / range) * (h - pad * 2);
+
+  const zeroY = y(0);
+  const zeroLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  zeroLine.setAttribute('x1', 0);
+  zeroLine.setAttribute('x2', w);
+  zeroLine.setAttribute('y1', zeroY);
+  zeroLine.setAttribute('y2', zeroY);
+  zeroLine.setAttribute('stroke', '#444a5a');
+  zeroLine.setAttribute('stroke-dasharray', '4 4');
+  svg.appendChild(zeroLine);
+
+  const points = history.map((p) => `${x(p.games)},${y(p.medals)}`).join(' ');
+  const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  polyline.setAttribute('points', points);
+  polyline.setAttribute('fill', 'none');
+  polyline.setAttribute('stroke', '#4a6cf7');
+  polyline.setAttribute('stroke-width', '1.5');
+  svg.appendChild(polyline);
+}
+
+document.getElementById('setting').addEventListener('change', resetAll);
+
+initState();
+</script>
+</body>
+</html>
