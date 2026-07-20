@@ -389,7 +389,7 @@ function playGame(state, setting) {
     mode = outcome === 'stay' ? state.mode : outcome;
   }
 
-  return { state: { mode, medals, games, gamesSinceLastBonus }, bonus };
+  return { state: { mode, medals, games, gamesSinceLastBonus }, bonus, yaku };
 }
 
 // initialState: { mode, medals, games }。totalGames到達までplayGameを繰り返す

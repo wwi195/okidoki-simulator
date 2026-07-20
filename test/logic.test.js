@@ -346,6 +346,13 @@ test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mod
   // trigger spin: payout 1 - BET_MEDALS(3) = -2; bonus: 70 games, +210 medals
   assert.deepEqual(result.state, { mode: 'normalA', medals: 208, games: 71, gamesSinceLastBonus: 0 });
   assert.equal(result.bonus, 'big');
+  assert.equal(result.yaku, 'kakuteiyaku');
+});
+
+test('playGame: result.yaku reports the drawn role even on a losing (miss) spin', () => {
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const result = withMockRandom([0.99999, 0.999999], () => logic.playGame(state, 1));
+  assert.equal(result.yaku, 'miss');
 });
 
 test('CEILING_GAMES has per-mode forced-win thresholds (setting-independent)', () => {
