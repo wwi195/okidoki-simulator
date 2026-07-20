@@ -5,79 +5,123 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>オキドキ シミュレーター</title>
 <style>
-  * { box-sizing: border-box; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d2b3a; --panel: #0a1f2b; --pink: #ff6f91; --coral: #ff9166;
+    --teal: #2ee6c5; --gold: #ffd166; --text: #eef7f6; --muted: #7fa3ad;
+  }
   body {
-    font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
-    background: #1b1d24;
-    color: #eee;
-    margin: 0;
-    padding: 16px;
+    background: var(--bg);
+    background-image: radial-gradient(ellipse at 50% 0%, rgba(255,111,145,0.18) 0%, transparent 60%);
+    color: var(--text); font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    min-height: 100vh; padding: 16px;
   }
-  h1 { font-size: 1.2rem; margin: 0 0 12px; }
+  h1 { font-size: 1.3rem; margin: 0 0 12px; color: var(--gold); text-align: center; letter-spacing: 2px; }
   .panel {
-    background: #262933;
-    border-radius: 8px;
+    background: var(--panel);
+    border: 1px solid #143646;
+    border-radius: 10px;
     padding: 14px;
-    margin-bottom: 14px;
+    margin: 0 auto 14px;
+    max-width: 380px;
   }
-  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
-  label { font-size: 0.85rem; color: #aab; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; justify-content: center; }
+  label { font-size: 0.85rem; color: var(--muted); }
   select, input[type="number"] {
-    background: #1b1d24;
-    color: #eee;
-    border: 1px solid #444a5a;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid #23485a;
     border-radius: 4px;
     padding: 4px 8px;
     font-size: 0.9rem;
   }
   button {
-    background: #4a6cf7;
-    color: #fff;
+    background: var(--teal);
+    color: #06262a;
     border: none;
-    border-radius: 4px;
-    padding: 6px 14px;
+    border-radius: 6px;
+    padding: 8px 14px;
     font-size: 0.9rem;
+    font-weight: bold;
     cursor: pointer;
   }
-  button:hover { background: #5c7cff; }
-  button.secondary { background: #3a3f4d; }
-  button.secondary:hover { background: #4a4f5d; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  button:hover { filter: brightness(1.1); }
+  button:disabled { opacity: .4; cursor: default; }
+  button.secondary { background: #1c3d4d; color: var(--muted); }
+  button.invest { background: var(--gold); color: #3a2600; }
+  button.spin { background: linear-gradient(180deg, var(--coral) 0%, #d9502f 100%); color: #fff; box-shadow: 0 4px 0 #8f2e15; }
+  button.spin:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #8f2e15; }
+  .tabs { display: flex; gap: 6px; margin: 0 auto 10px; max-width: 380px; justify-content: center; }
   .tab-btn {
-    background: #262933;
-    color: #aab;
-    border: 1px solid #444a5a;
-    border-radius: 4px 4px 0 0;
-    padding: 6px 14px;
+    background: var(--panel);
+    color: var(--muted);
+    border: 1px solid #143646;
+    border-radius: 6px 6px 0 0;
+    padding: 6px 16px;
   }
-  .tab-btn.active { background: #4a6cf7; color: #fff; border-color: #4a6cf7; }
+  .tab-btn.active { background: var(--teal); color: #06262a; border-color: var(--teal); }
   .tab-panel { display: none; }
   .tab-panel.active { display: block; }
-  .status { font-size: 0.85rem; color: #aab; margin-bottom: 10px; }
-  .status b { color: #eee; }
-  .stats { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; }
-  .stat { min-width: 100px; }
-  .stat .value { font-size: 1.3rem; font-weight: bold; }
-  .stat .label { font-size: 0.75rem; color: #aab; }
-  svg#slumpGraph { width: 100%; height: 220px; background: #1b1d24; border-radius: 4px; }
+  .status { font-size: 0.85rem; color: var(--muted); text-align: center; margin-bottom: 10px; }
+  .status b { color: var(--text); }
+  .stats { display: flex; gap: 18px; flex-wrap: wrap; margin: 10px 0; justify-content: center; }
+  .stat { min-width: 80px; text-align: center; }
+  .stat .value { font-size: 1.3rem; font-weight: bold; color: var(--gold); }
+  .stat .label { font-size: 0.75rem; color: var(--muted); }
+  svg#slumpGraph { width: 100%; height: 220px; background: var(--bg); border-radius: 4px; }
+
+  /* プレイ画面 */
+  .reel-area { background: #06181f; border: 3px solid #23485a; border-radius: 8px; padding: 12px; margin-bottom: 10px; display: flex; justify-content: center; align-items: center; gap: 12px; min-height: 64px; }
+  .result-icon { width: 44px; height: 44px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 26px; background: #0a1f2b; border: 1px solid #23485a; }
+  .win-display { text-align: center; font-size: 15px; min-height: 22px; margin-bottom: 10px; font-weight: bold; }
+  .win-display.big { color: var(--gold); font-size: 18px; }
+  .win-display.reg { color: var(--teal); }
+  .win-display.win { color: var(--pink); }
+  .win-display.miss { color: var(--muted); font-weight: normal; }
+  .medal-bar { background: var(--bg); border: 1px solid #23485a; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .medal-label { font-size: 11px; color: var(--muted); }
+  .medal-count { font-size: 20px; font-weight: bold; color: var(--gold); }
+  .btn-area { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 6px; }
+  .btn-area .full { grid-column: span 2; }
+  .cash-comment { font-size: 11px; color: var(--teal); text-align: center; margin-top: 6px; min-height: 16px; }
+
   #log {
     font-family: "SF Mono", Consolas, monospace;
-    font-size: 0.8rem;
-    background: #1b1d24;
+    font-size: 0.78rem;
+    background: var(--bg);
     border-radius: 4px;
     padding: 8px;
-    height: 320px;
+    height: 220px;
     overflow-y: auto;
     white-space: pre;
   }
   #log div { padding: 1px 0; }
-  #log div.bonus-big { color: #ff6b6b; }
-  #log div.bonus-reg { color: #ffd166; }
+  #log div.log-big { color: var(--gold); font-weight: bold; }
+  #log div.log-reg { color: var(--teal); font-weight: bold; }
+  #log div.log-win { color: var(--pink); }
+  #log div.log-replay { color: #9fb; }
+  #log div.log-miss { color: var(--muted); }
+  #log div.log-invest { color: var(--gold); }
+
+  /* ハイビスカス演出 */
+  .hibiscus-overlay { display: none; position: fixed; inset: 0; background: rgba(3,15,20,0.94); z-index: 100; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+  .hibiscus-overlay.show { display: flex; }
+  .hibiscus-flower {
+    font-size: 90px;
+    animation: hibiscusFlash .5s ease-in-out infinite alternate;
+  }
+  @keyframes hibiscusFlash {
+    from { opacity: 0.35; transform: scale(0.92); filter: drop-shadow(0 0 6px var(--pink)); }
+    to   { opacity: 1;    transform: scale(1.08); filter: drop-shadow(0 0 30px var(--pink)); }
+  }
+  .hibiscus-text { font-size: 26px; color: var(--pink); font-weight: bold; letter-spacing: 3px; text-align: center; }
+  .judge-btn { all: unset; cursor: pointer; padding: 16px 28px; background: linear-gradient(180deg, var(--gold) 0%, #cc9a2e 100%); border-radius: 12px; text-align: center; font-size: 20px; font-weight: bold; color: #3a2600; box-shadow: 0 5px 0 #7a5c14; }
+  .judge-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #7a5c14; }
 </style>
 </head>
 <body>
 
-<h1>オキドキ シミュレーター</h1>
+<h1>🌺 オキドキ シミュレーター 🌺</h1>
 
 <div class="panel">
   <div class="row">
@@ -96,11 +140,32 @@
 </div>
 
 <div class="tabs">
-  <button class="tab-btn active" data-tab="batch">一括実行</button>
-  <button class="tab-btn" data-tab="viewer">1Gビューアー</button>
+  <button class="tab-btn active" data-tab="play">プレイ</button>
+  <button class="tab-btn" data-tab="batch">分析（一括実行）</button>
 </div>
 
-<div class="tab-panel active panel" id="tab-batch">
+<div class="tab-panel active panel" id="tab-play">
+  <div class="reel-area">
+    <div class="result-icon" id="r1">🌺</div>
+    <div class="result-icon" id="r2">🌺</div>
+    <div class="result-icon" id="r3">🌺</div>
+  </div>
+  <div class="win-display miss" id="winDisplay">投資してスタート</div>
+  <div class="medal-bar">
+    <div class="medal-label">所持メダル</div>
+    <div class="medal-count" id="medalCount">0枚</div>
+  </div>
+  <div class="btn-area">
+    <button class="spin full" id="spinBtn" disabled>スピン</button>
+    <button class="invest" id="investBtn">5,000円投資</button>
+    <button class="secondary" id="skipBtn" disabled>⏩ 次の当たりまでスキップ</button>
+    <button class="secondary full" id="cashOutBtn">精算</button>
+  </div>
+  <div class="cash-comment" id="cashComment"></div>
+  <div id="log"></div>
+</div>
+
+<div class="tab-panel panel" id="tab-batch">
   <div class="row">
     <label for="totalGames">総ゲーム数</label>
     <input type="number" id="totalGames" value="6000" min="1" step="100">
@@ -115,25 +180,40 @@
   <svg id="slumpGraph" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
 </div>
 
-<div class="tab-panel panel" id="tab-viewer">
-  <div class="row">
-    <button id="spinBtn">スピン</button>
-    <button class="secondary" id="clearLogBtn">ログクリア</button>
-  </div>
-  <div id="log"></div>
+<!-- ハイビスカス演出（ボーナスジャッジ） -->
+<div class="hibiscus-overlay" id="hibiscusOverlay">
+  <div class="hibiscus-flower">🌺</div>
+  <div class="hibiscus-text">ハイビスカス<br>チャンス！！</div>
+  <button class="judge-btn" id="judgeBtn">🌺 7 を 揃 え る</button>
 </div>
 
 <script src="logic.js"></script>
 <script>
 'use strict';
 
+const YAKU_LABELS = {
+  replay: '🔄 リプレイ',
+  oshijunBell: '🔔 ベル',
+  commonBell: '🔔 ベル',
+  cherry: '🍒 チェリー',
+  suika: '🍉 スイカ',
+  kakuteiyaku: '⭐ 確定役',
+  kakuteiCherry: '🍒 確定チェリー',
+  chudanCherry: '🍒 中段チェリー',
+  miss: 'ハズレ',
+};
+
 let state = null;
+let bigCount = 0;
+let regCount = 0;
+let wallet = 0;
+let cashOutCount = 0;
+let pendingResult = null; // 当選確定演出待ちのplayGame結果
 
 function initState() {
-  const setting = Number(document.getElementById('setting').value);
   state = { mode: rollResetMode(), medals: 0, games: 0, gamesSinceLastBonus: 0 };
   renderStatus();
-  return setting;
+  renderPlayScreen();
 }
 
 function currentSetting() {
@@ -143,6 +223,13 @@ function currentSetting() {
 function renderStatus() {
   const el = document.getElementById('status');
   el.innerHTML = `モード: <b>${state.mode}</b> / 差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, CEILING_GAMES[state.mode] - state.gamesSinceLastBonus)}</b>`;
+}
+
+function renderPlayScreen() {
+  document.getElementById('medalCount').textContent = `${state.medals}枚`;
+  const canSpin = state.medals >= BET_MEDALS && !pendingResult;
+  document.getElementById('spinBtn').disabled = !canSpin;
+  document.getElementById('skipBtn').disabled = !canSpin;
 }
 
 // ===== タブ切り替え =====
@@ -157,8 +244,17 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
 
 // ===== リセット =====
 function resetAll() {
+  bigCount = 0;
+  regCount = 0;
+  wallet = 0;
+  cashOutCount = 0;
+  pendingResult = null;
   initState();
   document.getElementById('log').innerHTML = '';
+  document.getElementById('winDisplay').textContent = '投資してスタート';
+  document.getElementById('winDisplay').className = 'win-display miss';
+  document.getElementById('cashComment').textContent = '';
+  ['r1', 'r2', 'r3'].forEach((id) => document.getElementById(id).textContent = '🌺');
   clearGraph();
   document.getElementById('statBig').textContent = '-';
   document.getElementById('statReg').textContent = '-';
@@ -167,51 +263,157 @@ function resetAll() {
 }
 
 document.getElementById('resetBtn').addEventListener('click', resetAll);
+document.getElementById('setting').addEventListener('change', resetAll);
 
-// ===== 1Gビューアー =====
-document.getElementById('spinBtn').addEventListener('click', () => {
-  const setting = currentSetting();
-  const result = playGame(state, setting);
-  state = result.state;
+// ===== 投資 =====
+document.getElementById('investBtn').addEventListener('click', () => {
+  state.medals += INVEST_MEDALS;
   renderStatus();
-  appendLog(result);
+  renderPlayScreen();
+  addLog(`💴 5,000円投資 +${INVEST_MEDALS}枚`, 'log-invest');
 });
 
-document.getElementById('clearLogBtn').addEventListener('click', () => {
-  document.getElementById('log').innerHTML = '';
+// ===== スピン =====
+document.getElementById('spinBtn').addEventListener('click', () => {
+  const result = playGame(state, currentSetting());
+  handleSpinResult(result);
 });
 
-function appendLog(result) {
+function handleSpinResult(result) {
+  const icon = (YAKU_LABELS[result.yaku] || '').match(/^\S+/)?.[0] || '🌺';
+  ['r1', 'r2', 'r3'].forEach((id) => document.getElementById(id).textContent = icon);
+
+  if (result.bonus) {
+    pendingResult = result;
+    document.getElementById('winDisplay').textContent = '🌺 ハイビスカスチャンス！';
+    document.getElementById('winDisplay').className = 'win-display win';
+    document.getElementById('hibiscusOverlay').classList.add('show');
+    renderPlayScreen();
+    return;
+  }
+
+  const before = state.medals;
+  state = result.state;
+  const net = state.medals - before;
+  const wd = document.getElementById('winDisplay');
+  wd.textContent = `${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`;
+  wd.className = 'win-display ' + (result.yaku === 'miss' ? 'miss' : result.yaku === 'replay' ? '' : 'win');
+  addLog(`${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`, result.yaku === 'miss' ? 'log-miss' : result.yaku === 'replay' ? 'log-replay' : 'log-win');
+
+  renderStatus();
+  renderPlayScreen();
+}
+
+// ===== 次の当たりまでスキップ =====
+document.getElementById('skipBtn').addEventListener('click', () => {
+  const setting = currentSetting();
+  let spins = 0;
+  const tally = {};
+
+  while (state.medals >= BET_MEDALS) {
+    const result = playGame(state, setting);
+    if (result.bonus) {
+      pendingResult = result;
+      break;
+    }
+    state = result.state;
+    spins++;
+    tally[result.yaku] = (tally[result.yaku] || 0) + 1;
+  }
+
+  const summary = Object.entries(tally)
+    .map(([yaku, count]) => `${(YAKU_LABELS[yaku] || yaku).replace(/^\S+\s*/, '')}${count}`)
+    .join(' ');
+  addLog(`⏩ ${spins}G消化${summary ? ' / ' + summary : ''}`, 'log-replay');
+
+  renderStatus();
+  renderPlayScreen();
+
+  if (pendingResult) {
+    document.getElementById('winDisplay').textContent = '🌺 ハイビスカスチャンス！';
+    document.getElementById('winDisplay').className = 'win-display win';
+    document.getElementById('hibiscusOverlay').classList.add('show');
+  } else {
+    addLog('メダルが尽きました。投資してください', 'log-miss');
+  }
+});
+
+// ===== ボーナスジャッジ =====
+document.getElementById('judgeBtn').addEventListener('click', () => {
+  document.getElementById('hibiscusOverlay').classList.remove('show');
+  if (!pendingResult) return;
+
+  const { bonus } = pendingResult;
+  if (bonus === 'big') bigCount++; else regCount++;
+  state = pendingResult.state;
+  pendingResult = null;
+
+  const wd = document.getElementById('winDisplay');
+  const label = bonus === 'big' ? '🎰 BIG BONUS!!' : '🎰 REG BONUS!!';
+  wd.textContent = label;
+  wd.className = 'win-display ' + bonus;
+  addLog(label, bonus === 'big' ? 'log-big' : 'log-reg');
+
+  renderStatus();
+  renderPlayScreen();
+});
+
+// ===== 精算 =====
+document.getElementById('cashOutBtn').addEventListener('click', () => {
+  if (state.medals <= 0) return;
+  const yen = state.medals * MEDAL_UNIT_PRICE;
+  const rounded = Math.floor(yen / 1000) * 1000;
+  const remainder = yen - rounded;
+  wallet += rounded;
+  cashOutCount++;
+  state.medals = 0;
+
+  const commentEl = document.getElementById('cashComment');
+  if (remainder > 0) {
+    commentEl.textContent = `¥${remainder}分は花びらになりました🌸`;
+    addLog(`💰 第${cashOutCount}回精算 +¥${rounded.toLocaleString()} / ¥${remainder}分は花びらになりました🌸`, 'log-invest');
+  } else {
+    commentEl.textContent = '';
+    addLog(`💰 第${cashOutCount}回精算 +¥${rounded.toLocaleString()}`, 'log-invest');
+  }
+
+  renderStatus();
+  renderPlayScreen();
+});
+
+function addLog(msg, cls) {
   const log = document.getElementById('log');
-  const line = document.createElement('div');
-  const bonusText = result.bonus ? ` → ${result.bonus.toUpperCase()}当選！` : '';
-  line.textContent = `G${result.state.games}: モード=${result.state.mode} 差枚=${result.state.medals}${bonusText}`;
-  if (result.bonus === 'big') line.className = 'bonus-big';
-  if (result.bonus === 'reg') line.className = 'bonus-reg';
-  log.appendChild(line);
+  const div = document.createElement('div');
+  div.className = cls;
+  div.textContent = `G${state.games}: ${msg}`;
+  log.appendChild(div);
   while (log.children.length > 500) log.removeChild(log.firstChild);
   log.scrollTop = log.scrollHeight;
 }
 
-// ===== 一括実行 =====
+// ===== 分析（一括実行） =====
 document.getElementById('runBtn').addEventListener('click', () => {
+  if (pendingResult) return;
   const setting = currentSetting();
   const totalGames = Number(document.getElementById('totalGames').value);
-  let bigCount = 0;
-  let regCount = 0;
+  let batchBig = 0;
+  let batchReg = 0;
   const history = [{ games: state.games, medals: state.medals }];
 
   while (state.games < totalGames) {
     const result = playGame(state, setting);
     state = result.state;
-    if (result.bonus === 'big') bigCount++;
-    if (result.bonus === 'reg') regCount++;
+    if (result.bonus === 'big') batchBig++;
+    if (result.bonus === 'reg') batchReg++;
     history.push({ games: state.games, medals: state.medals });
   }
+  bigCount += batchBig;
+  regCount += batchReg;
 
   renderStatus();
-  document.getElementById('statBig').textContent = bigCount;
-  document.getElementById('statReg').textContent = regCount;
+  renderPlayScreen();
+  document.getElementById('statBig').textContent = batchBig;
+  document.getElementById('statReg').textContent = batchReg;
   document.getElementById('statMedals').textContent = state.medals;
   document.getElementById('statGames').textContent = state.games;
   drawSlumpGraph(history);
@@ -242,7 +444,7 @@ function drawSlumpGraph(history) {
   zeroLine.setAttribute('x2', w);
   zeroLine.setAttribute('y1', zeroY);
   zeroLine.setAttribute('y2', zeroY);
-  zeroLine.setAttribute('stroke', '#444a5a');
+  zeroLine.setAttribute('stroke', '#23485a');
   zeroLine.setAttribute('stroke-dasharray', '4 4');
   svg.appendChild(zeroLine);
 
@@ -250,12 +452,10 @@ function drawSlumpGraph(history) {
   const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
   polyline.setAttribute('points', points);
   polyline.setAttribute('fill', 'none');
-  polyline.setAttribute('stroke', '#4a6cf7');
+  polyline.setAttribute('stroke', '#2ee6c5');
   polyline.setAttribute('stroke-width', '1.5');
   svg.appendChild(polyline);
 }
-
-document.getElementById('setting').addEventListener('change', resetAll);
 
 initState();
 </script>
