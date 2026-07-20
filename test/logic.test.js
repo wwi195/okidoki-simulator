@@ -292,3 +292,16 @@ test('invariant: every (mode, role, setting) distribution sums to 100', () => {
     }
   }
 });
+
+test('BONUS_PAYOUT_TABLE has fixed game count and net medals/game for BIG and REG', () => {
+  assert.deepEqual(logic.BONUS_PAYOUT_TABLE.big, { games: 70, netMedalsPerGame: 3.0 });
+  assert.deepEqual(logic.BONUS_PAYOUT_TABLE.reg, { games: 30, netMedalsPerGame: 3.0 });
+});
+
+test('resolveBonusPayout returns games and total net medals for BIG', () => {
+  assert.deepEqual(logic.resolveBonusPayout('big'), { games: 70, netMedals: 210 });
+});
+
+test('resolveBonusPayout returns games and total net medals for REG', () => {
+  assert.deepEqual(logic.resolveBonusPayout('reg'), { games: 30, netMedals: 90 });
+});

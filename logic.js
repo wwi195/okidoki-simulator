@@ -328,6 +328,20 @@ function resolveModeTransition(mode, role, setting) {
   return result;
 }
 
+// ===== ボーナス中の払出（AT型・ゲーム数固定） =====
+// 通常時は隠れている押し順ベルがボーナス中は表示されるため取りこぼしがなくなり、
+// 差枚（賭け枚数控除後）でゲームあたり一定レートの純増となる。内部抽選は無い。
+const BONUS_PAYOUT_TABLE = {
+  big: { games: 70, netMedalsPerGame: 3.0 },
+  reg: { games: 30, netMedalsPerGame: 3.0 },
+};
+
+// type: 'big' | 'reg'
+function resolveBonusPayout(type) {
+  const { games, netMedalsPerGame } = BONUS_PAYOUT_TABLE[type];
+  return { games, netMedals: games * netMedalsPerGame };
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     MEDAL_UNIT_PRICE,
@@ -350,5 +364,7 @@ if (typeof module !== 'undefined' && module.exports) {
     rollFromDistribution,
     MODE_TRANSITION_TABLE,
     resolveModeTransition,
+    BONUS_PAYOUT_TABLE,
+    resolveBonusPayout,
   };
 }
