@@ -201,6 +201,7 @@ const YAKU_LABELS = {
   kakuteiCherry: '🍒 確定チェリー',
   chudanCherry: '🍒 中段チェリー',
   miss: 'ハズレ',
+  missPayout: 'ハズレ',
 };
 
 const YAKU_ICONS = {
@@ -213,6 +214,7 @@ const YAKU_ICONS = {
   kakuteiCherry: '🍒',
   chudanCherry: '🍒',
   miss: '－',
+  missPayout: '－',
 };
 
 let state = null;
@@ -331,7 +333,7 @@ document.getElementById('skipBtn').addEventListener('click', () => {
     }
     state = result.state;
     spins++;
-    const tallyKey = result.yaku === 'firstBell' ? 'miss' : result.yaku;
+    const tallyKey = (result.yaku === 'firstBell' || result.yaku === 'missPayout') ? 'miss' : result.yaku;
     tally[tallyKey] = (tally[tallyKey] || 0) + 1;
   }
 
