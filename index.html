@@ -193,7 +193,7 @@
 
 const YAKU_LABELS = {
   replay: '🔄 リプレイ',
-  firstBell: '🔔 ベル(取りこぼし)',
+  firstBell: 'ハズレ',
   commonBell: '🔔 ベル',
   cherry: '🍒 チェリー',
   suika: '🍉 スイカ',
@@ -201,6 +201,18 @@ const YAKU_LABELS = {
   kakuteiCherry: '🍒 確定チェリー',
   chudanCherry: '🍒 中段チェリー',
   miss: 'ハズレ',
+};
+
+const YAKU_ICONS = {
+  replay: '🔄',
+  firstBell: '－',
+  commonBell: '🔔',
+  cherry: '🍒',
+  suika: '🍉',
+  kakuteiyaku: '⭐',
+  kakuteiCherry: '🍒',
+  chudanCherry: '🍒',
+  miss: '－',
 };
 
 let state = null;
@@ -280,7 +292,7 @@ document.getElementById('spinBtn').addEventListener('click', () => {
 });
 
 function handleSpinResult(result) {
-  const icon = (YAKU_LABELS[result.yaku] || '').match(/^\S+/)?.[0] || '🌺';
+  const icon = YAKU_ICONS[result.yaku] || '🌺';
   ['r1', 'r2', 'r3'].forEach((id) => document.getElementById(id).textContent = icon);
 
   if (result.bonus) {
@@ -319,11 +331,12 @@ document.getElementById('skipBtn').addEventListener('click', () => {
     }
     state = result.state;
     spins++;
-    tally[result.yaku] = (tally[result.yaku] || 0) + 1;
+    const tallyKey = result.yaku === 'firstBell' ? 'miss' : result.yaku;
+    tally[tallyKey] = (tally[tallyKey] || 0) + 1;
   }
 
   const summary = Object.entries(tally)
-    .map(([yaku, count]) => `${(YAKU_LABELS[yaku] || yaku).replace(/^\S+\s*/, '')}${count}`)
+    .map(([yaku, count]) => `${(YAKU_LABELS[yaku] || yaku).replace(/^\S+\s+/, '')}${count}`)
     .join(' ');
   addLog(`⏩ ${spins}G消化${summary ? ' / ' + summary : ''}`, 'log-replay');
 
