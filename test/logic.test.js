@@ -73,6 +73,22 @@ test('rollYaku lands in a middle role interval, not just the endpoints', () => {
   assert.equal(withMockRandom([afterReplayAndBell + 0.00001], () => logic.rollYaku(1)), 'commonBell');
 });
 
+test('MISS_PAYOUT_SHARE moves 15% of the residual (post-named-role) probability to a 1-medal payout', () => {
+  assert.equal(logic.MISS_PAYOUT_SHARE, 0.15);
+  assert.equal(logic.KOYAKU_PAYOUT.missPayout, 1);
+});
+
+test('rollYaku splits the residual into missPayout(15%) then miss(85%)', () => {
+  const namedCum = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
+    + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku
+    + logic.KOYAKU_PROB.kakuteiCherry + logic.KOYAKU_PROB.chudanCherry;
+  const missPayoutThreshold = namedCum + (1 - namedCum) * logic.MISS_PAYOUT_SHARE;
+
+  assert.equal(withMockRandom([namedCum + 0.0000001], () => logic.rollYaku(1)), 'missPayout');
+  assert.equal(withMockRandom([missPayoutThreshold - 0.0000001], () => logic.rollYaku(1)), 'missPayout');
+  assert.equal(withMockRandom([missPayoutThreshold + 0.0000001], () => logic.rollYaku(1)), 'miss');
+});
+
 test('triggerBucket classifies confirmed-BIG roles, cherry, suika, and everything else', () => {
   assert.equal(logic.triggerBucket('chudanCherry'), 'confirmed');
   assert.equal(logic.triggerBucket('kakuteiCherry'), 'confirmed');
@@ -83,6 +99,7 @@ test('triggerBucket classifies confirmed-BIG roles, cherry, suika, and everythin
   assert.equal(logic.triggerBucket('firstBell'), 'other');
   assert.equal(logic.triggerBucket('commonBell'), 'other');
   assert.equal(logic.triggerBucket('miss'), 'other');
+  assert.equal(logic.triggerBucket('missPayout'), 'other');
 });
 
 test('transitionRole keeps chudanCherry and confirmed(kakuteiCherry/kakuteiyaku) separate', () => {

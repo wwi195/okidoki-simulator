@@ -47,7 +47,12 @@ const KOYAKU_PAYOUT = {
   kakuteiyaku: 1,
   kakuteiCherry: 1,
   chudanCherry: 1,
+  missPayout: 1,
 };
+
+// コイン持ち調整用: 名前付き役に当たらなかった残り(ハズレ相当)のうち、
+// この割合を1枚払い出し(missPayout)に振り分け、残りを完全ハズレ(miss)とする。
+const MISS_PAYOUT_SHARE = 0.15;
 
 // 1G分の成立役抽選（BIG/REG自体はここでは決めない。契機役の判定のみ）
 const YAKU_ORDER = [
@@ -68,6 +73,8 @@ function rollYaku(setting) {
     cum += yakuProb(key, setting);
     if (r < cum) return key;
   }
+  const missPayoutThreshold = cum + (1 - cum) * MISS_PAYOUT_SHARE;
+  if (r < missPayoutThreshold) return 'missPayout';
   return 'miss';
 }
 
@@ -428,6 +435,7 @@ if (typeof module !== 'undefined' && module.exports) {
     COMMON_BELL_PROB,
     FIRST_BELL_PROB,
     KOYAKU_PAYOUT,
+    MISS_PAYOUT_SHARE,
     rollYaku,
     triggerBucket,
     transitionRole,
