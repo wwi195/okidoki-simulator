@@ -175,6 +175,7 @@
     <div class="stat"><div class="value" id="statBig">-</div><div class="label">BIG回数</div></div>
     <div class="stat"><div class="value" id="statReg">-</div><div class="label">REG回数</div></div>
     <div class="stat"><div class="value" id="statFreeze">-</div><div class="label">超ドキ<br>ロングフリーズ</div></div>
+    <div class="stat"><div class="value" id="statFreezePeak">-</div><div class="label">超ドキ滞在<br>最高獲得枚数</div></div>
     <div class="stat"><div class="value" id="statMedals">-</div><div class="label">最終差枚</div></div>
     <div class="stat"><div class="value" id="statGames">-</div><div class="label">消化G数</div></div>
   </div>
@@ -285,6 +286,7 @@ function resetAll() {
   document.getElementById('statBig').textContent = '-';
   document.getElementById('statReg').textContent = '-';
   document.getElementById('statFreeze').textContent = '-';
+  document.getElementById('statFreezePeak').textContent = '-';
   document.getElementById('statMedals').textContent = '-';
   document.getElementById('statGames').textContent = '-';
 }
@@ -422,6 +424,11 @@ function addLog(msg, cls, gCountOverride) {
   log.scrollTop = log.scrollHeight;
 }
 
+// 天国・ドキドキ・超ドキドキ・保証は互いに行き来しうる「上位モード群」として
+// 一続きのセッション扱いにする。セッション中にロングフリーズが一度でも
+// 発生していれば、そのセッションの最高獲得枚数(入った時点からの差分)を集計対象にする。
+const ELEVATED_MODES = new Set(['tengoku', 'dokidoki', 'superDokidoki', 'hosho']);
+
 // ===== 分析（一括実行） =====
 document.getElementById('runBtn').addEventListener('click', () => {
   if (pendingResult) return;
@@ -430,10 +437,13 @@ document.getElementById('runBtn').addEventListener('click', () => {
   let batchBig = 0;
   let batchReg = 0;
   let batchFreeze = 0;
+  let bestFreezeSessionPeak = 0;
+  let session = null; // { startMedals, hadFreeze, peakGain }
   const history = [{ games: state.games, medals: state.medals }];
   const freezes = [];
 
   while (state.games < totalGames) {
+    const wasElevated = ELEVATED_MODES.has(state.mode);
     const result = playGame(state, setting);
     state = result.state;
     if (result.bonus === 'big') batchBig++;
@@ -443,6 +453,22 @@ document.getElementById('runBtn').addEventListener('click', () => {
       freezes.push({ games: state.games, medals: state.medals });
     }
     history.push({ games: state.games, medals: state.medals });
+
+    const nowElevated = ELEVATED_MODES.has(state.mode);
+    if (nowElevated && !wasElevated) {
+      session = { startMedals: state.medals, hadFreeze: false, peakGain: 0 };
+    }
+    if (nowElevated && session) {
+      if (result.freeze) session.hadFreeze = true;
+      session.peakGain = Math.max(session.peakGain, state.medals - session.startMedals);
+    }
+    if (!nowElevated && wasElevated && session) {
+      if (session.hadFreeze) bestFreezeSessionPeak = Math.max(bestFreezeSessionPeak, session.peakGain);
+      session = null;
+    }
+  }
+  if (session && session.hadFreeze) {
+    bestFreezeSessionPeak = Math.max(bestFreezeSessionPeak, session.peakGain);
   }
   bigCount += batchBig;
   regCount += batchReg;
@@ -452,6 +478,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
   document.getElementById('statBig').textContent = batchBig;
   document.getElementById('statReg').textContent = batchReg;
   document.getElementById('statFreeze').textContent = batchFreeze;
+  document.getElementById('statFreezePeak').textContent = batchFreeze > 0 ? `+${bestFreezeSessionPeak}` : '-';
   document.getElementById('statMedals').textContent = state.medals;
   document.getElementById('statGames').textContent = state.games;
   drawSlumpGraph(history, freezes);
@@ -468,9 +495,9 @@ function drawSlumpGraph(history, freezes) {
 
   const w = 600, h = 220, pad = 4;
   const maxGames = history[history.length - 1].games || 1;
-  const medalValues = history.map((p) => p.medals);
-  const minM = Math.min(0, ...medalValues);
-  const maxM = Math.max(0, ...medalValues);
+  // 配列展開のMath.max(...arr)は要素数が多いとスタックオーバーフローするため、reduceで求める
+  const minM = history.reduce((m, p) => Math.min(m, p.medals), 0);
+  const maxM = history.reduce((m, p) => Math.max(m, p.medals), 0);
   const range = (maxM - minM) || 1;
 
   const x = (g) => pad + (g / maxGames) * (w - pad * 2);
@@ -493,6 +520,30 @@ function drawSlumpGraph(history, freezes) {
   polyline.setAttribute('stroke', '#2ee6c5');
   polyline.setAttribute('stroke-width', '1.5');
   svg.appendChild(polyline);
+
+  // 頂点・底に、実際の値を外側(500枚単位)へ切り上げ/切り下げしたラベルを表示
+  const peakPoint = history.reduce((a, b) => (b.medals > a.medals ? b : a));
+  const troughPoint = history.reduce((a, b) => (b.medals < a.medals ? b : a));
+  const peakLabel = Math.ceil(peakPoint.medals / 500) * 500;
+  const troughLabel = Math.floor(troughPoint.medals / 500) * 500;
+
+  const peakText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  peakText.setAttribute('x', x(peakPoint.games));
+  peakText.setAttribute('y', y(peakPoint.medals) - 6);
+  peakText.setAttribute('text-anchor', 'middle');
+  peakText.setAttribute('font-size', '11');
+  peakText.setAttribute('fill', '#2ee6c5');
+  peakText.textContent = `${peakLabel >= 0 ? '+' : ''}${peakLabel}`;
+  svg.appendChild(peakText);
+
+  const troughText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  troughText.setAttribute('x', x(troughPoint.games));
+  troughText.setAttribute('y', y(troughPoint.medals) + 14);
+  troughText.setAttribute('text-anchor', 'middle');
+  troughText.setAttribute('font-size', '11');
+  troughText.setAttribute('fill', '#ff6f91');
+  troughText.textContent = `${troughLabel >= 0 ? '+' : ''}${troughLabel}`;
+  svg.appendChild(troughText);
 
   for (const f of freezes || []) {
     const cx = x(f.games);
