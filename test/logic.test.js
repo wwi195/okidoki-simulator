@@ -365,13 +365,46 @@ test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mod
   const cumBeforeKakuteiyaku = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1]
     + logic.COMMON_BELL_PROB[1] + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika;
   // r1 -> rollYaku(1) = 'kakuteiyaku' (confirmed bucket, rollBonusTrigger consumes no random)
-  // r2=0 -> rollBigOrReg(1) = 'big'
-  // r3=0 -> rollFromDistribution({stay:45.31, normalB:25, tengoku:25, dokidoki:4.69}) = 'stay'
-  const result = withMockRandom([cumBeforeKakuteiyaku + 0.0000001, 0, 0], () => logic.playGame(state, 1));
+  // r2=0.5 -> long-freeze roll fails (FREEZE_PROB.confirmed=0.05)
+  // r3=0 -> rollBigOrReg(1) = 'big'
+  // r4=0 -> rollFromDistribution({stay:45.31, normalB:25, tengoku:25, dokidoki:4.69}) = 'stay'
+  const result = withMockRandom([cumBeforeKakuteiyaku + 0.0000001, 0.5, 0, 0], () => logic.playGame(state, 1));
   // trigger spin: payout 1 - BET_MEDALS(3) = -2; bonus: 70 games, +210 medals
   assert.deepEqual(result.state, { mode: 'normalA', medals: 208, games: 71, gamesSinceLastBonus: 0 });
   assert.equal(result.bonus, 'big');
   assert.equal(result.yaku, 'kakuteiyaku');
+  assert.equal(result.freeze, false);
+});
+
+test('FREEZE_PROB gives the long-freeze probability per winning-role bucket', () => {
+  assert.deepEqual(logic.FREEZE_PROB, {
+    chudanCherry: 0.50, confirmed: 0.05, cherry: 0.0156, suika: 0.0156, other: 0,
+  });
+});
+
+test('playGame: chudanCherry win + long-freeze roll succeeds -> forces BIG + superDokidoki', () => {
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const cumBeforeChudanCherry = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
+    + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku + logic.KOYAKU_PROB.kakuteiCherry;
+  // r1 -> rollYaku(1) = 'chudanCherry' (confirmed bucket, rollBonusTrigger consumes no random)
+  // r2=0 -> long-freeze roll succeeds (FREEZE_PROB.chudanCherry=0.50) -> forces BIG + superDokidoki,
+  //          skipping rollBigOrReg/resolveModeTransition entirely
+  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0], () => logic.playGame(state, 1));
+  assert.deepEqual(result.state, { mode: 'superDokidoki', medals: 208, games: 71, gamesSinceLastBonus: 0 });
+  assert.equal(result.bonus, 'big');
+  assert.equal(result.freeze, true);
+});
+
+test('playGame: chudanCherry win + long-freeze roll fails -> falls back to the normal BIG/REG + mode-transition roll', () => {
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const cumBeforeChudanCherry = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
+    + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku + logic.KOYAKU_PROB.kakuteiCherry;
+  // r1 -> 'chudanCherry'; r2=0.99 -> freeze fails; r3=0 -> rollBigOrReg(1)='big';
+  // r4=0 -> rollFromDistribution(normalA.chudanCherry: {tengoku:75, dokidoki:24.22, superDokidoki:0.78}) = 'tengoku'
+  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0.99, 0, 0], () => logic.playGame(state, 1));
+  assert.deepEqual(result.state, { mode: 'tengoku', medals: 208, games: 71, gamesSinceLastBonus: 0 });
+  assert.equal(result.bonus, 'big');
+  assert.equal(result.freeze, false);
 });
 
 test('playGame: result.yaku reports the drawn role even on a losing (miss) spin', () => {

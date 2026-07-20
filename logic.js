@@ -379,8 +379,19 @@ const CEILING_GAMES = {
   hosho: 32, tengoku: 32, dokidoki: 32, superDokidoki: 32,
 };
 
+// 超ドキドキ・ロングフリーズ発生率（当選契機役ごと、全設定共通）
+// 発生時は「BIG＋超ドキドキモード移行」が確定し、通常のBIG/REG抽選と
+// モード移行抽選をどちらもスキップする。
+const FREEZE_PROB = {
+  chudanCherry: 0.50,
+  confirmed: 0.05,
+  cherry: 0.0156,
+  suika: 0.0156,
+  other: 0,
+};
+
 // state: { mode, medals, games, gamesSinceLastBonus }
-// 戻り値: { state: 更新後state, bonus: null | 'big' | 'reg' }
+// 戻り値: { state: 更新後state, bonus: null | 'big' | 'reg', freeze: 超ドキ・ロングフリーズが発生したか }
 function playGame(state, setting) {
   const yaku = rollYaku(setting);
   const spinNet = yaku === 'replay' ? 0 : (KOYAKU_PAYOUT[yaku] || 0) - BET_MEDALS;
@@ -390,26 +401,36 @@ function playGame(state, setting) {
   let mode = state.mode;
   let gamesSinceLastBonus = state.gamesSinceLastBonus + 1;
   let bonus = null;
+  let freeze = false;
 
   const bucket = triggerBucket(yaku);
   const naturalWin = rollBonusTrigger(state.mode, bucket, setting);
   const ceilingWin = !naturalWin && gamesSinceLastBonus >= CEILING_GAMES[state.mode];
 
   if (naturalWin || ceilingWin) {
-    const type = rollBigOrReg(setting);
+    const role = naturalWin ? transitionRole(yaku) : transitionRole('ceiling');
+    const freezeProb = FREEZE_PROB[role] || 0;
+    freeze = freezeProb > 0 && Math.random() < freezeProb;
+
+    let type;
+    if (freeze) {
+      type = 'big';
+      mode = 'superDokidoki';
+    } else {
+      type = rollBigOrReg(setting);
+      const dist = resolveModeTransition(state.mode, role, setting);
+      const outcome = rollFromDistribution(dist);
+      mode = outcome === 'stay' ? state.mode : outcome;
+    }
+
     const payout = resolveBonusPayout(type);
     medals += payout.netMedals;
     games += payout.games;
     bonus = type;
     gamesSinceLastBonus = 0;
-
-    const role = naturalWin ? transitionRole(yaku) : transitionRole('ceiling');
-    const dist = resolveModeTransition(state.mode, role, setting);
-    const outcome = rollFromDistribution(dist);
-    mode = outcome === 'stay' ? state.mode : outcome;
   }
 
-  return { state: { mode, medals, games, gamesSinceLastBonus }, bonus, yaku };
+  return { state: { mode, medals, games, gamesSinceLastBonus }, bonus, yaku, freeze };
 }
 
 // initialState: { mode, medals, games }。totalGames到達までplayGameを繰り返す
@@ -456,6 +477,7 @@ if (typeof module !== 'undefined' && module.exports) {
     RESET_MODE_DISTRIBUTION,
     rollResetMode,
     CEILING_GAMES,
+    FREEZE_PROB,
     playGame,
     simulate,
   };
