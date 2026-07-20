@@ -24,9 +24,8 @@ test('medal economics: 20 yen/medal, 5000 yen invests 250 medals', () => {
   assert.equal(logic.INVEST_MEDALS, 250);
 });
 
-test('KOYAKU_PROB has the 7 common-across-settings role probabilities', () => {
+test('KOYAKU_PROB has the 6 common-across-settings role probabilities', () => {
   assert.equal(logic.KOYAKU_PROB.replay, 1 / 5.05);
-  assert.equal(logic.KOYAKU_PROB.oshijunBell, 1 / 1.325);
   assert.equal(logic.KOYAKU_PROB.cherry, 1 / 32.13);
   assert.equal(logic.KOYAKU_PROB.suika, 1 / 128.00);
   assert.equal(logic.KOYAKU_PROB.kakuteiyaku, 1 / 8192.00);
@@ -43,8 +42,17 @@ test('COMMON_BELL_PROB has the setting-dependent common bell probability', () =>
   assert.equal(logic.COMMON_BELL_PROB[6], 1 / 128.50);
 });
 
+test('FIRST_BELL_PROB has the setting-dependent 中/右1stベル probability (never pays out in normal mode)', () => {
+  assert.equal(logic.FIRST_BELL_PROB[1], 1 / 5.29);
+  assert.equal(logic.FIRST_BELL_PROB[2], 1 / 5.29);
+  assert.equal(logic.FIRST_BELL_PROB[3], 1 / 5.29);
+  assert.equal(logic.FIRST_BELL_PROB[4], 1 / 5.29);
+  assert.equal(logic.FIRST_BELL_PROB[5], 1 / 5.30);
+  assert.equal(logic.FIRST_BELL_PROB[6], 1 / 5.30);
+});
+
 test('KOYAKU_PAYOUT has payout medals for each paying small role', () => {
-  assert.equal(logic.KOYAKU_PAYOUT.oshijunBell, 7);
+  assert.equal(logic.KOYAKU_PAYOUT.firstBell, 0); // 通常時は押し順を知らないため発動しない(=ハズレ扱い)
   assert.equal(logic.KOYAKU_PAYOUT.commonBell, 7);
   assert.equal(logic.KOYAKU_PAYOUT.cherry, 1);
   assert.equal(logic.KOYAKU_PAYOUT.suika, 4);
@@ -55,13 +63,13 @@ test('KOYAKU_PAYOUT has payout medals for each paying small role', () => {
 
 test('rollYaku picks the role whose cumulative probability range contains the draw', () => {
   // cumulative thresholds at setting 1, in table order:
-  // replay < replay+oshijunBell < +commonBell(s1) < +cherry < +suika < +kakuteiyaku < +kakuteiCherry < +chudanCherry < miss
+  // replay < replay+firstBell < +commonBell(s1) < +cherry < +suika < +kakuteiyaku < +kakuteiCherry < +chudanCherry < miss
   assert.equal(withMockRandom([0], () => logic.rollYaku(1)), 'replay');
   assert.equal(withMockRandom([0.99999], () => logic.rollYaku(1)), 'miss');
 });
 
 test('rollYaku lands in a middle role interval, not just the endpoints', () => {
-  const afterReplayAndBell = logic.KOYAKU_PROB.replay + logic.KOYAKU_PROB.oshijunBell;
+  const afterReplayAndBell = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1];
   assert.equal(withMockRandom([afterReplayAndBell + 0.00001], () => logic.rollYaku(1)), 'commonBell');
 });
 
@@ -72,7 +80,7 @@ test('triggerBucket classifies confirmed-BIG roles, cherry, suika, and everythin
   assert.equal(logic.triggerBucket('cherry'), 'cherry');
   assert.equal(logic.triggerBucket('suika'), 'suika');
   assert.equal(logic.triggerBucket('replay'), 'other');
-  assert.equal(logic.triggerBucket('oshijunBell'), 'other');
+  assert.equal(logic.triggerBucket('firstBell'), 'other');
   assert.equal(logic.triggerBucket('commonBell'), 'other');
   assert.equal(logic.triggerBucket('miss'), 'other');
 });
@@ -337,7 +345,7 @@ test('playGame: a miss costs the full bet (net -BET_MEDALS), no bonus', () => {
 
 test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mode transition in one call', () => {
   const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 50 };
-  const cumBeforeKakuteiyaku = logic.KOYAKU_PROB.replay + logic.KOYAKU_PROB.oshijunBell
+  const cumBeforeKakuteiyaku = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1]
     + logic.COMMON_BELL_PROB[1] + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika;
   // r1 -> rollYaku(1) = 'kakuteiyaku' (confirmed bucket, rollBonusTrigger consumes no random)
   // r2=0 -> rollBigOrReg(1) = 'big'

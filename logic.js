@@ -8,7 +8,6 @@ const INVEST_MEDALS = INVEST_YEN / MEDAL_UNIT_PRICE; // 250
 // ===== 小役確率（全設定共通） =====
 const KOYAKU_PROB = {
   replay: 1 / 5.05,
-  oshijunBell: 1 / 1.325, // 押し順ベル合算。仕様書の1/1.32〜1.33の中間値を採用
   cherry: 1 / 32.13,
   suika: 1 / 128.00,
   kakuteiyaku: 1 / 8192.00,
@@ -17,6 +16,7 @@ const KOYAKU_PROB = {
 };
 
 // ===== 共通ベル確率（設定別） =====
+// 押し順を問わず払い戻しあり。通常時もボーナス中も成立する。
 const COMMON_BELL_PROB = {
   1: 1 / 168.04,
   2: 1 / 158.30,
@@ -26,9 +26,21 @@ const COMMON_BELL_PROB = {
   6: 1 / 128.50,
 };
 
+// ===== 中/右1stベル確率（設定別） =====
+// 正解押し順を知らないと取りこぼす役。通常時は発動しない(=ハズレ扱い)ため
+// KOYAKU_PAYOUT.firstBellは0。
+const FIRST_BELL_PROB = {
+  1: 1 / 5.29,
+  2: 1 / 5.29,
+  3: 1 / 5.29,
+  4: 1 / 5.29,
+  5: 1 / 5.30,
+  6: 1 / 5.30,
+};
+
 // ===== 小役払出（枚数） =====
 const KOYAKU_PAYOUT = {
-  oshijunBell: 7,
+  firstBell: 0,
   commonBell: 7,
   cherry: 1,
   suika: 4,
@@ -39,12 +51,13 @@ const KOYAKU_PAYOUT = {
 
 // 1G分の成立役抽選（BIG/REG自体はここでは決めない。契機役の判定のみ）
 const YAKU_ORDER = [
-  'replay', 'oshijunBell', 'commonBell', 'cherry', 'suika',
+  'replay', 'firstBell', 'commonBell', 'cherry', 'suika',
   'kakuteiyaku', 'kakuteiCherry', 'chudanCherry',
 ];
 
 function yakuProb(key, setting) {
   if (key === 'commonBell') return COMMON_BELL_PROB[setting];
+  if (key === 'firstBell') return FIRST_BELL_PROB[setting];
   return KOYAKU_PROB[key];
 }
 
@@ -413,6 +426,7 @@ if (typeof module !== 'undefined' && module.exports) {
     INVEST_MEDALS,
     KOYAKU_PROB,
     COMMON_BELL_PROB,
+    FIRST_BELL_PROB,
     KOYAKU_PAYOUT,
     rollYaku,
     triggerBucket,
