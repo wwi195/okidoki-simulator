@@ -154,6 +154,10 @@
   <div class="win-display miss" id="winDisplay">投資してスタート</div>
   <div class="chain-display" id="chainDisplay" style="display:none;"></div>
   <div class="medal-bar">
+    <div class="medal-label">所持金</div>
+    <div class="medal-count" id="walletCount">¥0</div>
+  </div>
+  <div class="medal-bar">
     <div class="medal-label">所持メダル</div>
     <div class="medal-count" id="medalCount">0枚</div>
   </div>
@@ -243,7 +247,8 @@ const MODE_LABELS = {
 let state = null;
 let bigCount = 0;
 let regCount = 0;
-let wallet = 0;
+const INITIAL_WALLET = 100000;
+let wallet = INITIAL_WALLET;
 let cashOutCount = 0;
 let pendingResult = null; // 当選確定演出待ちのplayGame結果
 let chainCount = 0; // 32G以内で繋がっている連チャン数
@@ -294,6 +299,13 @@ function renderPlayScreen() {
   const canSpin = state.medals >= BET_MEDALS && !pendingResult;
   document.getElementById('spinBtn').disabled = !canSpin;
   document.getElementById('skipBtn').disabled = !canSpin;
+  renderWallet();
+}
+
+function renderWallet() {
+  const el = document.getElementById('walletCount');
+  el.textContent = wallet < 0 ? `-¥${Math.abs(wallet).toLocaleString()}` : `¥${wallet.toLocaleString()}`;
+  el.style.color = wallet < 0 ? '#ff4444' : '';
 }
 
 // ===== タブ切り替え =====
@@ -311,7 +323,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
 function resetAll() {
   bigCount = 0;
   regCount = 0;
-  wallet = 0;
+  wallet = INITIAL_WALLET;
   cashOutCount = 0;
   pendingResult = null;
   chainCount = 0;
@@ -347,6 +359,7 @@ document.getElementById('setting').addEventListener('change', resetAll);
 
 // ===== 投資 =====
 document.getElementById('investBtn').addEventListener('click', () => {
+  wallet -= INVEST_YEN;
   state.medals += INVEST_MEDALS;
   chainStartMedals += INVEST_MEDALS; // 投資分は連チャンの獲得枚数に含めない
   renderStatus();
