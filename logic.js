@@ -176,9 +176,10 @@ function rollBonusTrigger(mode, bucket, setting) {
 // - suikaはRB:BB=50:50固定
 // - otherはモード群・設定ごとの実測RB:BB比率
 function rollBonusTypeNatural(mode, bucket, setting) {
-  if (bucket === 'confirmed' || bucket === 'cherry') return 'big';
-  if (bucket === 'suika') return Math.random() < 0.5 ? 'reg' : 'big';
-  const { rb, bb } = WIN_RATE_TABLE[modeGroupKey(mode)].other;
+  if (bucket === 'confirmed') return 'big';
+  // cherry/suika/otherはすべてWIN_RATE_TABLEの実測rb:bb比率で振り分ける
+  // (cherryはrb=0のため常にbig、suikaは+1ポイント調整によりbb寄りになった)
+  const { rb, bb } = WIN_RATE_TABLE[modeGroupKey(mode)][bucket];
   const idx = setting - 1;
   return Math.random() < rb[idx] / (rb[idx] + bb[idx]) ? 'reg' : 'big';
 }
@@ -364,6 +365,28 @@ function computeRawOutcomes(row, setting, useLocalInterpolation) {
   throw new Error('unknown mode transition row type: ' + row.type);
 }
 
+// 0G連・0G天井当選時、ボーナス消化後のモードは「それ以上」（ステイまたは上位モード）に
+// 限定され、転落しない。対象モードの「その他」行から下記の転落先キーを除外して使う。
+const ZERO_CEILING_FALL_TARGETS = {
+  hosho: ['normalA', 'normalB', 'hikimodoshi'],
+  tengoku: ['normalA', 'normalB', 'hikimodoshi'],
+  dokidoki: ['hosho'],
+  superDokidoki: ['hosho'],
+};
+
+// distから指定キー(転落先)を取り除き、残りの比率を保ったまま合計100になるよう再スケールする。
+function excludeFallsAndRenormalize(dist, fallKeys) {
+  const filtered = {};
+  for (const [k, v] of Object.entries(dist)) {
+    if (!fallKeys.includes(k)) filtered[k] = v;
+  }
+  const sum = Object.values(filtered).reduce((s, v) => s + v, 0);
+  const factor = 100 / sum;
+  const result = {};
+  for (const k in filtered) result[k] = filtered[k] * factor;
+  return result;
+}
+
 // role: transitionRole()の戻り値（'chudanCherry'|'confirmed'|'cherry'|'suika'|'other'）
 function resolveModeTransition(mode, role, setting) {
   const modeTable = MODE_TRANSITION_TABLE[mode];
@@ -494,7 +517,10 @@ function playGame(state, setting) {
       type = naturalWin
         ? rollBonusTypeNatural(state.mode, bucket, setting)
         : rollBonusTypeCeiling(state.ceiling);
-      const dist = resolveModeTransition(state.mode, role, setting);
+      let dist = resolveModeTransition(state.mode, role, setting);
+      if (isZeroCeiling && ZERO_CEILING_FALL_TARGETS[state.mode]) {
+        dist = excludeFallsAndRenormalize(dist, ZERO_CEILING_FALL_TARGETS[state.mode]);
+      }
       const outcome = rollFromDistribution(dist);
       mode = outcome === 'stay' ? state.mode : outcome;
     }
@@ -551,6 +577,8 @@ if (typeof module !== 'undefined' && module.exports) {
     rollFromDistribution,
     MODE_TRANSITION_TABLE,
     resolveModeTransition,
+    ZERO_CEILING_FALL_TARGETS,
+    excludeFallsAndRenormalize,
     BONUS_PAYOUT_TABLE,
     resolveBonusPayout,
     BET_MEDALS,

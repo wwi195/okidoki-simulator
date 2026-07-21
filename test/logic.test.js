@@ -148,12 +148,19 @@ test('modeGroupKey maps the 8 internal modes to their 4 win-rate groups', () => 
 });
 
 test('WIN_RATE_TABLE has RB/BB win rates (%) per mode group, role, and setting 1-6', () => {
+  // +1ポイント調整は機械割が過剰になったため撤回し、元の実測値に戻した
   assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.suika.rb, [1.83, 1.98, 2.14, 2.29, 2.44, 2.59]);
   assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.suika.bb, [1.83, 1.98, 2.14, 2.29, 2.44, 2.59]);
   assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.cherry.rb, [0, 0, 0, 0, 0, 0]);
   assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.cherry.bb, [0.92, 1.07, 1.22, 1.37, 1.53, 1.68]);
   assert.deepEqual(logic.WIN_RATE_TABLE.heavenGroup.other.rb, [3.66, 3.66, 3.66, 3.66, 3.66, 3.66]);
   assert.deepEqual(logic.WIN_RATE_TABLE.heavenGroup.other.bb, [8.54, 8.54, 8.54, 8.54, 8.54, 8.54]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.heavenGroup.suika.bb, [12.50, 13.26, 14.03, 14.79, 15.55, 16.31]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.heavenGroup.cherry.bb, [6.25, 6.63, 7.01, 7.39, 7.78, 8.16]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.hikimodoshi.suika.bb, [4.58, 4.96, 5.34, 5.72, 6.10, 6.48]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.hikimodoshi.cherry.bb, [2.29, 2.67, 3.05, 3.43, 3.81, 4.20]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.chance.suika.bb, [5.49, 5.95, 6.41, 6.87, 7.32, 7.78]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.chance.cherry.bb, [2.75, 3.20, 3.66, 4.12, 4.58, 5.04]);
 });
 
 test('rollBonusTrigger: confirmed bucket always wins regardless of roll', () => {
@@ -171,9 +178,11 @@ test('rollBonusTypeNatural: confirmed/cherry buckets are BIG-only', () => {
   assert.equal(withMockRandom([0.999999], () => logic.rollBonusTypeNatural('normalA', 'cherry', 1)), 'big');
 });
 
-test('rollBonusTypeNatural: suika bucket splits RB:BB exactly 50:50', () => {
-  assert.equal(withMockRandom([0.4999], () => logic.rollBonusTypeNatural('normalA', 'suika', 1)), 'reg');
-  assert.equal(withMockRandom([0.5], () => logic.rollBonusTypeNatural('normalA', 'suika', 1)), 'big');
+test('rollBonusTypeNatural: suika bucket splits by its own rb/(rb+bb) ratio (currently 50:50)', () => {
+  const rbShare = logic.WIN_RATE_TABLE.normalAB.suika.rb[0]
+    / (logic.WIN_RATE_TABLE.normalAB.suika.rb[0] + logic.WIN_RATE_TABLE.normalAB.suika.bb[0]);
+  assert.equal(withMockRandom([rbShare - 0.0001], () => logic.rollBonusTypeNatural('normalA', 'suika', 1)), 'reg');
+  assert.equal(withMockRandom([rbShare], () => logic.rollBonusTypeNatural('normalA', 'suika', 1)), 'big');
 });
 
 test('rollBonusTypeNatural: other bucket splits by the mode-group\'s per-setting rb/(rb+bb) ratio', () => {
@@ -534,6 +543,20 @@ test('playGame: freeze-forced ceiling(0) guarantees a BIG on the very next spin 
     { mode: 'superDokidoki', medals: result1.state.medals - 3 + 210, games: result1.state.games + 1 + 70, gamesSinceLastBonus: 0, ceiling: 32 });
 });
 
+test('playGame: a 0G連/0G天井 win never falls out of dokidoki, even on a roll that would hit hosho unfiltered', () => {
+  // dokidoki.other unfiltered = {hosho:17.97, stay:81.64, superDokidoki:0.39}; r=5 would land in
+  // hosho's 0-17.97 slice. With hosho excluded per ZERO_CEILING_FALL_TARGETS.dokidoki, it must
+  // resolve to 'stay' (dokidoki) instead.
+  const state = { mode: 'dokidoki', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 0 };
+  // r1=0.99999 -> rollYaku(1)='miss' (irrelevant: isZeroCeiling bypasses the natural-trigger check)
+  // r2=0.99 -> long-freeze roll for the ceiling path (FREEZE_PROB_CEILING=0.0003) fails
+  // r3=0.05 -> rollFromDistribution(filtered dist) -> r=5, lands in 'stay' (not hosho, which no longer exists)
+  // r4=0.99 -> rollCeiling('dokidoki'): no early trigger -> 32
+  const result = withMockRandom([0.99999, 0.99, 0.05, 0.99], () => logic.playGame(state, 1));
+  assert.equal(result.bonus, 'big');
+  assert.deepEqual(result.state, { mode: 'dokidoki', medals: -3 + 210, games: 1 + 70, gamesSinceLastBonus: 0, ceiling: 32 });
+});
+
 test('playGame: chudanCherry win + long-freeze roll fails -> falls back to the normal BIG/REG + mode-transition roll', () => {
   const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 1000 };
   const cumBeforeChudanCherry = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
@@ -562,7 +585,7 @@ test('CEILING_GAMES has per-mode forced-win thresholds (setting-independent)', (
   });
 });
 
-test('CEILING_EARLY_TRIGGER: 12.5% chance of an early ceiling per mode-stay', () => {
+test('CEILING_EARLY_TRIGGER: 12.5% early-ceiling chance per mode-stay (15% was tried and reverted, overshot 機械割)', () => {
   assert.deepEqual(logic.CEILING_EARLY_TRIGGER, {
     hosho: { prob: 0.125, games: 0 },
     tengoku: { prob: 0.125, games: 0 },
@@ -585,6 +608,23 @@ test('rollCeiling: modes with an early-trigger config roll 12.5% early / 87.5% C
   assert.equal(withMockRandom([0.99], () => logic.rollCeiling('hosho')), 32);
   assert.equal(withMockRandom([0], () => logic.rollCeiling('hikimodoshi')), 100);
   assert.equal(withMockRandom([0.99], () => logic.rollCeiling('hikimodoshi')), 200);
+});
+
+test('ZERO_CEILING_FALL_TARGETS lists the fall-tier destinations excluded on a 0G連/0G天井 win', () => {
+  assert.deepEqual(logic.ZERO_CEILING_FALL_TARGETS, {
+    hosho: ['normalA', 'normalB', 'hikimodoshi'],
+    tengoku: ['normalA', 'normalB', 'hikimodoshi'],
+    dokidoki: ['hosho'],
+    superDokidoki: ['hosho'],
+  });
+});
+
+test('excludeFallsAndRenormalize removes fall-tier keys and rescales the remainder to 100', () => {
+  const result = logic.excludeFallsAndRenormalize({ hosho: 17.97, stay: 81.64, superDokidoki: 0.39 }, ['hosho']);
+  assert.equal(result.hosho, undefined);
+  const sum = Object.values(result).reduce((s, v) => s + v, 0);
+  assert.ok(Math.abs(sum - 100) < 1e-9);
+  assertClose(result.stay / result.superDokidoki, 81.64 / 0.39, 'stay/superDokidoki ratio preserved');
 });
 
 test('playGame: reaching the mode ceiling forces a win even when the natural roll misses', () => {
