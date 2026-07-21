@@ -573,22 +573,24 @@ document.getElementById('runBtn').addEventListener('click', () => {
   regCount += batchReg;
 
   // 統計(最終差枚・機械割)には生の差枚をそのまま使う。一方、途中で差枚が0を
-  // 下回った分は実際には都度追加投資して遊技を続けた想定になるため、履歴を
-  // 辿って0で床打ちしたシミュレーションをやり直し、そのシミュレーション上の
-  // 最終メダル数と実質投資額を求める。最終差枚がプラスでも、その過程で一度でも
+  // 下回った分は実際には5,000円投資ボタン(+250枚)単位で都度追加投資して遊技を
+  // 続けた想定になるため、履歴を辿って0を下回るたびに250枚単位で追加投資する
+  // シミュレーションをやり直し、そのシミュレーション上の最終メダル数と実際の
+  // 投資回数を求める。所持金は必ず5,000円単位でのみ減るようにする(10円単位の
+  // ような半端な減り方はしない)。最終差枚がプラスでも、その過程で一度でも
   // マイナスに落ち込んでいれば、所持金はその分減っているはずなので、最終値
   // だけを見て判定すると所持金の減少を見逃してしまう。
   const rawFinalMedals = state.medals;
   let shadowMedals = 0;
-  let bankedDeficit = 0;
+  let investCount = 0;
   for (let i = 1; i < history.length; i++) {
     shadowMedals += history[i].medals - history[i - 1].medals;
-    if (shadowMedals < 0) {
-      bankedDeficit += shadowMedals;
-      shadowMedals = 0;
+    while (shadowMedals < 0) {
+      shadowMedals += INVEST_MEDALS;
+      investCount++;
     }
   }
-  wallet += bankedDeficit * MEDAL_UNIT_PRICE;
+  wallet -= investCount * INVEST_YEN;
   state.medals = shadowMedals;
 
   renderStatus();
