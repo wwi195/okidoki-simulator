@@ -219,7 +219,11 @@ const MODE_TRANSITION_TABLE = {
       even: { type: 'range', ranges: { normalB: [57.81, 60.94] }, fixed: { tengoku: 20.31, dokidoki: 1.56 } },
       exceptions: { 3: { tengoku: 21.88 }, 5: { tengoku: 23.44 } },
     },
-    other: { type: 'range', ranges: { normalB: [25.00, 39.06], tengoku: [10.16, 11.72] }, fixed: { dokidoki: 0.78 } },
+    other: {
+      type: 'oddEven',
+      odd: { type: 'range', ranges: { tengoku: [10.16, 11.72] }, fixed: { normalB: 25.00, dokidoki: 0.78 } },
+      even: { type: 'range', ranges: { normalB: [37.50, 39.06] }, fixed: { tengoku: 10.16, dokidoki: 0.78 } },
+    },
   },
   normalB: {
     chudanCherry: { type: 'fixed', outcomes: { tengoku: 50.00, dokidoki: 49.22, superDokidoki: 0.78 } },

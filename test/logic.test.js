@@ -223,17 +223,28 @@ test('normalA suika transition: odd settings fixed, even settings ranged, with s
     { normalB: 60.94, tengoku: 20.31, dokidoki: 1.56, stay: 17.19 });
 });
 
-test('normalA other (cherry falls back to it too) is ranged with a fixed dokidoki', () => {
+test('normalA other (cherry falls back to it too): odd settings range tengoku(fixed normalB), even settings range normalB(fixed tengoku)', () => {
+  // ユーザー提供の実測データ(設定1-6)と照合済み。SETTING_POSITIONの滑らかな
+  // 補間ではなく、奇数/偶数それぞれの内部でのみ線形補間するoddEven構造だった。
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'other', 1),
+    { normalB: 25.00, tengoku: 10.16, dokidoki: 0.78, stay: 64.06 });
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'other', 2),
+    { normalB: 37.50, tengoku: 10.16, dokidoki: 0.78, stay: 51.56 });
+  const s3 = logic.resolveModeTransition('normalA', 'other', 3);
+  assert.equal(s3.normalB, 25.00);
+  assert.ok(Math.abs(s3.tengoku - 10.94) < 1e-9);
+  assert.equal(s3.dokidoki, 0.78);
+  assert.equal(s3.stay, 63.28);
+  const s4 = logic.resolveModeTransition('normalA', 'other', 4);
+  assert.ok(Math.abs(s4.normalB - 38.28) < 1e-9);
+  assert.equal(s4.tengoku, 10.16);
+  assert.equal(s4.dokidoki, 0.78);
+  assert.equal(s4.stay, 50.78);
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'other', 5),
+    { normalB: 25.00, tengoku: 11.72, dokidoki: 0.78, stay: 62.50 });
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'other', 6),
+    { normalB: 39.06, tengoku: 10.16, dokidoki: 0.78, stay: 50.00 });
   const s1 = logic.resolveModeTransition('normalA', 'other', 1);
-  assert.equal(s1.normalB, 25.00);
-  assert.equal(s1.tengoku, 10.16);
-  assert.equal(s1.dokidoki, 0.78);
-  assert.ok(Math.abs(s1.stay - 64.06) < 1e-9);
-  const s6 = logic.resolveModeTransition('normalA', 'other', 6);
-  assert.equal(s6.normalB, 39.06);
-  assert.equal(s6.tengoku, 11.72);
-  assert.equal(s6.dokidoki, 0.78);
-  assert.ok(Math.abs(s6.stay - 48.44) < 1e-9);
   assert.deepEqual(logic.resolveModeTransition('normalA', 'cherry', 1), s1); // cherryはotherにフォールバック
 });
 
@@ -433,10 +444,10 @@ test('playGame: reaching the mode ceiling forces a win even when the natural rol
   // r1=0.99999 -> rollYaku(1) = 'miss'; r2 high -> natural rollBonusTrigger = false
   // gamesSinceLastBonus becomes 1000 === CEILING_GAMES.normalA -> forced win
   // r3=0 -> rollBigOrReg(1) = 'big'
-  // r4=0 -> rollFromDistribution(normalA.other dist, setting1) = first key ('dokidoki')
+  // r4=0 -> rollFromDistribution(normalA.other dist, setting1) = first key ('normalB')
   const result = withMockRandom([0.99999, 0.999999, 0, 0], () => logic.playGame(state, 1));
   assert.equal(result.bonus, 'big');
-  assert.deepEqual(result.state, { mode: 'dokidoki', medals: -3 + 210, games: 1 + 70, gamesSinceLastBonus: 0 });
+  assert.deepEqual(result.state, { mode: 'normalB', medals: -3 + 210, games: 1 + 70, gamesSinceLastBonus: 0 });
 });
 
 test('simulate: runs playGame until the cumulative game count reaches totalGames, tallying BIG/REG', () => {
