@@ -248,17 +248,54 @@ test('normalA other (cherry falls back to it too): odd settings range tengoku(fi
   assert.deepEqual(logic.resolveModeTransition('normalA', 'cherry', 1), s1); // cherryはotherにフォールバック
 });
 
-test('normalB rows: fixed chudanCherry/confirmed, ranged suika/other', () => {
+// 仕様書側が小数点2桁までの表記のため、内部の線形補間結果とは最大で
+// ±0.01程度ずれることがある(例: 9.375という真値が資料では9.38と丸められる)。
+// これは既知の丸め誤差であり不具合ではない(コミット420730fと同じ許容範囲)。
+function assertClose(actual, expected, msg) {
+  assert.ok(Math.abs(actual - expected) < 0.01, `${msg}: expected ${expected}, got ${actual}`);
+}
+
+test('normalB rows: fixed chudanCherry/confirmed', () => {
   assert.deepEqual(logic.resolveModeTransition('normalB', 'chudanCherry', 1),
     { tengoku: 50.00, dokidoki: 49.22, superDokidoki: 0.78 });
   assert.deepEqual(logic.resolveModeTransition('normalB', 'confirmed', 1),
     { stay: 25.00, tengoku: 50.00, dokidoki: 25.00 });
-  const suikaS1 = logic.resolveModeTransition('normalB', 'suika', 1);
-  assert.equal(suikaS1.tengoku, 59.38);
-  assert.equal(suikaS1.dokidoki, 15.63);
-  const suikaS6 = logic.resolveModeTransition('normalB', 'suika', 6);
-  assert.equal(suikaS6.tengoku, 67.97);
-  assert.equal(suikaS6.dokidoki, 20.31);
+});
+
+test('normalB suika: odd settings fix tengoku(59.38)/range dokidoki, even settings fix dokidoki(15.63)/range tengoku', () => {
+  // ユーザー提供の実測データ(設定1-6)と照合済み。
+  const expected = {
+    1: { tengoku: 59.38, dokidoki: 17.19, stay: 23.43 },
+    2: { tengoku: 64.84, dokidoki: 15.63, stay: 19.53 },
+    3: { tengoku: 59.38, dokidoki: 18.75, stay: 21.87 },
+    4: { tengoku: 66.41, dokidoki: 15.63, stay: 17.96 },
+    5: { tengoku: 59.38, dokidoki: 20.31, stay: 20.31 },
+    6: { tengoku: 67.97, dokidoki: 15.63, stay: 16.40 },
+  };
+  for (const [setting, exp] of Object.entries(expected)) {
+    const r = logic.resolveModeTransition('normalB', 'suika', Number(setting));
+    assertClose(r.tengoku, exp.tengoku, `setting${setting} tengoku`);
+    assertClose(r.dokidoki, exp.dokidoki, `setting${setting} dokidoki`);
+    assertClose(r.stay, exp.stay, `setting${setting} stay`);
+  }
+});
+
+test('normalB other: odd settings fix tengoku(42.19)/range dokidoki, even settings fix dokidoki(7.81)/range tengoku', () => {
+  // ユーザー提供の実測データ(設定1-6)と照合済み。
+  const expected = {
+    1: { tengoku: 42.19, dokidoki: 8.59, stay: 49.22 },
+    2: { tengoku: 53.13, dokidoki: 7.81, stay: 39.06 },
+    3: { tengoku: 42.19, dokidoki: 9.38, stay: 48.43 },
+    4: { tengoku: 53.91, dokidoki: 7.81, stay: 38.28 },
+    5: { tengoku: 42.19, dokidoki: 10.16, stay: 47.65 },
+    6: { tengoku: 54.69, dokidoki: 7.81, stay: 37.50 },
+  };
+  for (const [setting, exp] of Object.entries(expected)) {
+    const r = logic.resolveModeTransition('normalB', 'other', Number(setting));
+    assertClose(r.tengoku, exp.tengoku, `setting${setting} tengoku`);
+    assertClose(r.dokidoki, exp.dokidoki, `setting${setting} dokidoki`);
+    assertClose(r.stay, exp.stay, `setting${setting} stay`);
+  }
 });
 
 test('tengoku rows: cherry/chudanCherry/confirmed/suika fixed, other splits by odd/even', () => {
@@ -294,16 +331,51 @@ test('hosho rows are all fixed and setting-independent', () => {
     { normalA: 65.23, normalB: 10.16, hikimodoshi: 20.31, tengoku: 3.91, dokidoki: 0.39 });
 });
 
-test('hikimodoshi confirmed sums to exactly 100 with no stay; suika/other ranged and always valid', () => {
+test('hikimodoshi rows: fixed chudanCherry/confirmed', () => {
+  assert.deepEqual(logic.resolveModeTransition('hikimodoshi', 'chudanCherry', 1),
+    { tengoku: 75.00, dokidoki: 24.22, superDokidoki: 0.78 });
   assert.deepEqual(logic.resolveModeTransition('hikimodoshi', 'confirmed', 1),
     { normalB: 50.00, tengoku: 45.31, dokidoki: 4.69 });
-  const suikaS1 = logic.resolveModeTransition('hikimodoshi', 'suika', 1);
-  const sumS1 = Object.values(suikaS1).reduce((s, v) => s + v, 0);
-  assert.ok(Math.abs(sumS1 - 100) < 1e-6);
-  const suikaS6 = logic.resolveModeTransition('hikimodoshi', 'suika', 6);
-  const sumS6 = Object.values(suikaS6).reduce((s, v) => s + v, 0);
-  assert.ok(Math.abs(sumS6 - 100) < 1e-6);
-  assert.equal(suikaS6.stay, undefined); // s6は合計100超のため比例縮小され、stayは付かない
+});
+
+test('hikimodoshi suika: odd settings fixed except setting3/5 exceptions, even settings ranged', () => {
+  // ユーザー提供の実測データ(設定1-6)と照合済み。合計は全設定でちょうど100(stayなし)。
+  const expected = {
+    1: { normalA: 25.00, normalB: 42.19, tengoku: 31.25, dokidoki: 1.56 },
+    2: { normalA: 25.00, normalB: 42.19, tengoku: 31.25, dokidoki: 1.56 },
+    3: { normalA: 25.00, normalB: 40.63, tengoku: 32.81, dokidoki: 1.56 },
+    4: { normalA: 23.44, normalB: 43.75, tengoku: 31.25, dokidoki: 1.56 },
+    5: { normalA: 25.00, normalB: 39.06, tengoku: 34.38, dokidoki: 1.56 },
+    6: { normalA: 21.88, normalB: 45.31, tengoku: 31.25, dokidoki: 1.56 },
+  };
+  for (const [setting, exp] of Object.entries(expected)) {
+    const r = logic.resolveModeTransition('hikimodoshi', 'suika', Number(setting));
+    assert.equal(r.stay, undefined);
+    assertClose(r.normalA, exp.normalA, `setting${setting} normalA`);
+    assertClose(r.normalB, exp.normalB, `setting${setting} normalB`);
+    assertClose(r.tengoku, exp.tengoku, `setting${setting} tengoku`);
+    assertClose(r.dokidoki, exp.dokidoki, `setting${setting} dokidoki`);
+  }
+});
+
+test('hikimodoshi other: odd settings fix normalA(50)/range tengoku+normalB, even settings fix tengoku(15.63)/range normalA+normalB', () => {
+  // ユーザー提供の実測データ(設定1-6)と照合済み。合計は全設定でちょうど100(stayなし)。
+  const expected = {
+    1: { normalA: 50.00, normalB: 33.59, tengoku: 15.63, dokidoki: 0.78 },
+    2: { normalA: 33.59, normalB: 50.00, tengoku: 15.63, dokidoki: 0.78 },
+    3: { normalA: 50.00, normalB: 32.81, tengoku: 16.41, dokidoki: 0.78 },
+    4: { normalA: 32.81, normalB: 50.78, tengoku: 15.63, dokidoki: 0.78 },
+    5: { normalA: 50.00, normalB: 32.03, tengoku: 17.19, dokidoki: 0.78 },
+    6: { normalA: 32.03, normalB: 51.56, tengoku: 15.63, dokidoki: 0.78 },
+  };
+  for (const [setting, exp] of Object.entries(expected)) {
+    const r = logic.resolveModeTransition('hikimodoshi', 'other', Number(setting));
+    assert.equal(r.stay, undefined);
+    assertClose(r.normalA, exp.normalA, `setting${setting} normalA`);
+    assertClose(r.normalB, exp.normalB, `setting${setting} normalB`);
+    assertClose(r.tengoku, exp.tengoku, `setting${setting} tengoku`);
+    assertClose(r.dokidoki, exp.dokidoki, `setting${setting} dokidoki`);
+  }
 });
 
 test('chance rows are all fixed', () => {

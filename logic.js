@@ -228,8 +228,16 @@ const MODE_TRANSITION_TABLE = {
   normalB: {
     chudanCherry: { type: 'fixed', outcomes: { tengoku: 50.00, dokidoki: 49.22, superDokidoki: 0.78 } },
     confirmed: { type: 'fixed', outcomes: { stay: 25.00, tengoku: 50.00, dokidoki: 25.00 } },
-    suika: { type: 'range', ranges: { tengoku: [59.38, 67.97], dokidoki: [15.63, 20.31] } },
-    other: { type: 'range', ranges: { tengoku: [42.19, 54.69], dokidoki: [7.81, 10.16] } },
+    suika: {
+      type: 'oddEven',
+      odd: { type: 'range', ranges: { dokidoki: [17.19, 20.31] }, fixed: { tengoku: 59.38 } },
+      even: { type: 'range', ranges: { tengoku: [64.84, 67.97] }, fixed: { dokidoki: 15.63 } },
+    },
+    other: {
+      type: 'oddEven',
+      odd: { type: 'range', ranges: { dokidoki: [8.59, 10.16] }, fixed: { tengoku: 42.19 } },
+      even: { type: 'range', ranges: { tengoku: [53.13, 54.69] }, fixed: { dokidoki: 7.81 } },
+    },
   },
   tengoku: {
     cherry: { type: 'fixed', outcomes: { stay: 99.22, dokidoki: 0.78 } },
@@ -267,14 +275,27 @@ const MODE_TRANSITION_TABLE = {
     chudanCherry: { type: 'fixed', outcomes: { tengoku: 75.00, dokidoki: 24.22, superDokidoki: 0.78 } },
     confirmed: { type: 'fixed', outcomes: { normalB: 50.00, tengoku: 45.31, dokidoki: 4.69 } },
     suika: {
-      type: 'range',
-      ranges: { normalA: [21.88, 25.00], normalB: [39.06, 45.31], tengoku: [31.25, 34.38] },
-      fixed: { dokidoki: 1.56 },
+      type: 'oddEven',
+      odd: { type: 'fixed', outcomes: { normalA: 25.00, normalB: 42.19, tengoku: 31.25, dokidoki: 1.56 } },
+      even: {
+        type: 'range',
+        ranges: { normalA: [25.00, 21.88], normalB: [42.19, 45.31] },
+        fixed: { tengoku: 31.25, dokidoki: 1.56 },
+      },
+      exceptions: { 3: { normalB: 40.63, tengoku: 32.81 }, 5: { normalB: 39.06, tengoku: 34.38 } },
     },
     other: {
-      type: 'range',
-      ranges: { normalA: [32.03, 50.00], normalB: [32.81, 51.56], tengoku: [15.63, 17.19] },
-      fixed: { dokidoki: 0.78 },
+      type: 'oddEven',
+      odd: {
+        type: 'range',
+        ranges: { tengoku: [15.63, 17.19], normalB: [33.59, 32.03] },
+        fixed: { normalA: 50.00, dokidoki: 0.78 },
+      },
+      even: {
+        type: 'range',
+        ranges: { normalA: [33.59, 32.03], normalB: [50.00, 51.56] },
+        fixed: { tengoku: 15.63, dokidoki: 0.78 },
+      },
     },
   },
   chance: {
