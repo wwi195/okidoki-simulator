@@ -78,6 +78,7 @@
   .win-display.reg { color: var(--teal); }
   .win-display.win { color: var(--pink); }
   .win-display.miss { color: var(--muted); font-weight: normal; }
+  .chain-display { text-align: center; font-size: 13px; font-weight: bold; color: var(--coral); margin-bottom: 8px; }
   .medal-bar { background: var(--bg); border: 1px solid #23485a; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .medal-label { font-size: 11px; color: var(--muted); }
   .medal-count { font-size: 20px; font-weight: bold; color: var(--gold); }
@@ -151,6 +152,7 @@
     <div class="result-icon" id="r3">🌺</div>
   </div>
   <div class="win-display miss" id="winDisplay">投資してスタート</div>
+  <div class="chain-display" id="chainDisplay" style="display:none;"></div>
   <div class="medal-bar">
     <div class="medal-label">所持メダル</div>
     <div class="medal-count" id="medalCount">0枚</div>
@@ -244,6 +246,8 @@ let regCount = 0;
 let wallet = 0;
 let cashOutCount = 0;
 let pendingResult = null; // 当選確定演出待ちのplayGame結果
+let chainCount = 0; // 32G以内で繋がっている連チャン数
+let chainStartMedals = 0; // 連チャン開始時点の差枚(獲得枚数の基準)
 
 function initState() {
   const mode = rollResetMode();
@@ -261,6 +265,28 @@ function renderStatus() {
   const isPlayTab = document.querySelector('.tab-btn.active')?.dataset.tab === 'play';
   const modePart = isPlayTab ? '' : `モード: <b>${MODE_LABELS[state.mode] || state.mode}</b> / `;
   el.innerHTML = `${modePart}差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, state.ceiling - state.gamesSinceLastBonus)}</b>`;
+}
+
+function updateChainDisplay() {
+  const el = document.getElementById('chainDisplay');
+  if (chainCount > 0 && state.gamesSinceLastBonus <= 32) {
+    const gained = state.medals - chainStartMedals;
+    el.textContent = `🔥 ${chainCount}連チャン中（${gained >= 0 ? '+' : ''}${gained}枚）`;
+    el.style.display = '';
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// bonus当選が確定した際に呼ぶ。gapは前回ボーナスからこのボーナスまでのG数(このスピン込み)。
+// preSpinMedalsはこのボーナスが乗る前の差枚(新しい連チャンの起点として使う)。
+function trackChain(gap, preSpinMedals) {
+  if (chainCount > 0 && gap <= 32) {
+    chainCount += 1;
+  } else {
+    chainCount = 1;
+    chainStartMedals = preSpinMedals;
+  }
 }
 
 function renderPlayScreen() {
@@ -288,6 +314,8 @@ function resetAll() {
   wallet = 0;
   cashOutCount = 0;
   pendingResult = null;
+  chainCount = 0;
+  chainStartMedals = 0;
   initState();
   document.getElementById('log').innerHTML = '';
   document.getElementById('winDisplay').textContent = '投資してスタート';
@@ -303,6 +331,7 @@ function resetAll() {
   document.getElementById('statMedals').textContent = '-';
   document.getElementById('statGames').textContent = '-';
   document.getElementById('statKikaiwari').textContent = '-';
+  updateChainDisplay();
 }
 
 document.getElementById('statsDetailToggle').addEventListener('click', () => {
@@ -319,8 +348,10 @@ document.getElementById('setting').addEventListener('change', resetAll);
 // ===== 投資 =====
 document.getElementById('investBtn').addEventListener('click', () => {
   state.medals += INVEST_MEDALS;
+  chainStartMedals += INVEST_MEDALS; // 投資分は連チャンの獲得枚数に含めない
   renderStatus();
   renderPlayScreen();
+  updateChainDisplay();
   addLog(`💴 5,000円投資 +${INVEST_MEDALS}枚`, 'log-invest');
 });
 
@@ -351,6 +382,7 @@ function handleSpinResult(result) {
   wd.textContent = `${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`;
   wd.className = 'win-display ' + style;
   addLog(`${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`, style === 'miss' ? 'log-miss' : style === '' ? 'log-replay' : 'log-win');
+  updateChainDisplay();
 
   renderStatus();
   renderPlayScreen();
@@ -381,6 +413,7 @@ document.getElementById('skipBtn').addEventListener('click', () => {
 
   renderStatus();
   renderPlayScreen();
+  updateChainDisplay();
 
   if (pendingResult) {
     document.getElementById('winDisplay').textContent = '🌺 ハイビスカスチャンス！';
@@ -399,6 +432,7 @@ document.getElementById('judgeBtn').addEventListener('click', () => {
   const { bonus } = pendingResult;
   const hitG = state.gamesSinceLastBonus + 1; // このスピンでボーナス間G数がリセットされる前の値
   if (bonus === 'big') bigCount++; else regCount++;
+  trackChain(hitG, state.medals);
   state = pendingResult.state;
   pendingResult = null;
 
@@ -410,6 +444,7 @@ document.getElementById('judgeBtn').addEventListener('click', () => {
 
   renderStatus();
   renderPlayScreen();
+  updateChainDisplay();
 });
 
 // ===== 精算 =====
@@ -420,6 +455,7 @@ document.getElementById('cashOutBtn').addEventListener('click', () => {
   const remainder = yen - rounded;
   wallet += rounded;
   cashOutCount++;
+  chainStartMedals -= state.medals; // 精算分は連チャンの獲得枚数計算から除外する
   state.medals = 0;
 
   const commentEl = document.getElementById('cashComment');
@@ -433,6 +469,7 @@ document.getElementById('cashOutBtn').addEventListener('click', () => {
 
   renderStatus();
   renderPlayScreen();
+  updateChainDisplay();
 });
 
 function addLog(msg, cls, gCountOverride) {
