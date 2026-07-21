@@ -79,6 +79,7 @@
   .win-display.win { color: var(--pink); }
   .win-display.miss { color: var(--muted); font-weight: normal; }
   .chain-display { text-align: center; font-size: 13px; font-weight: bold; color: var(--coral); margin-bottom: 8px; }
+  .bonus-gap-display { text-align: center; font-size: 12px; color: var(--muted); margin: 6px 0; }
   .medal-bar { background: var(--bg); border: 1px solid #23485a; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .medal-label { font-size: 11px; color: var(--muted); }
   .medal-count { font-size: 20px; font-weight: bold; color: var(--gold); }
@@ -151,6 +152,7 @@
     <div class="result-icon" id="r2">🌺</div>
     <div class="result-icon" id="r3">🌺</div>
   </div>
+  <div class="bonus-gap-display" id="bonusGapDisplay">ボーナス間: 0G</div>
   <div class="win-display miss" id="winDisplay">投資してスタート</div>
   <div class="chain-display" id="chainDisplay" style="display:none;"></div>
   <div class="medal-bar">
@@ -299,6 +301,7 @@ function renderPlayScreen() {
   const canSpin = state.medals >= BET_MEDALS && !pendingResult;
   document.getElementById('spinBtn').disabled = !canSpin;
   document.getElementById('skipBtn').disabled = !canSpin;
+  document.getElementById('bonusGapDisplay').textContent = `ボーナス間: ${state.gamesSinceLastBonus}G`;
   renderWallet();
 }
 
