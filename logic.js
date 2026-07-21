@@ -135,35 +135,60 @@ function modeGroupKey(mode) {
   return 'heavenGroup'; // hosho, tengoku, dokidoki, superDokidoki
 }
 
-const MODE_WIN_RATE_RANGES = {
+// モード群ごと・役ごとのRB/BB当選率（%表記、設定1-6の実測値をそのまま格納）。
+// 実機の資料では即告知/次G告知という演出タイミングの内訳があるが、払出計算には
+// 影響しないため合算済み。設定間の変化は単純な線形（旧SETTING_POSITIONの
+// 階段カーブは適用されない）だが、実測値をそのまま持つため補間は不要。
+const WIN_RATE_TABLE = {
   normalAB: {
-    other: [1 / 297.89, 1 / 234.06],
-    cherry: [0.0092, 0.0168],
-    suika: [0.0366, 0.0519],
+    suika: { rb: [1.83, 1.98, 2.14, 2.29, 2.44, 2.59], bb: [1.83, 1.98, 2.14, 2.29, 2.44, 2.59] },
+    cherry: { rb: [0, 0, 0, 0, 0, 0], bb: [0.92, 1.07, 1.22, 1.37, 1.53, 1.68] },
+    other: { rb: [0.14, 0.16, 0.18, 0.18, 0.20, 0.20], bb: [0.18, 0.20, 0.20, 0.20, 0.22, 0.22] },
   },
   hikimodoshi: {
-    other: [1 / 119.16, 1 / 93.62],
-    cherry: [0.0229, 0.0420],
-    suika: [0.0916, 0.1297],
+    suika: { rb: [4.58, 4.96, 5.34, 5.72, 6.10, 6.48], bb: [4.58, 4.96, 5.34, 5.72, 6.10, 6.48] },
+    cherry: { rb: [0, 0, 0, 0, 0, 0], bb: [2.29, 2.67, 3.05, 3.43, 3.81, 4.20] },
+    other: { rb: [0.36, 0.40, 0.42, 0.46, 0.48, 0.52], bb: [0.48, 0.48, 0.50, 0.52, 0.54, 0.54] },
   },
   chance: {
-    other: [1 / 99.30, 1 / 78.02],
-    cherry: [0.0275, 0.0504],
-    suika: [0.1099, 0.1556],
+    suika: { rb: [5.49, 5.95, 6.41, 6.87, 7.32, 7.78], bb: [5.49, 5.95, 6.41, 6.87, 7.32, 7.78] },
+    cherry: { rb: [0, 0, 0, 0, 0, 0], bb: [2.75, 3.20, 3.66, 4.12, 4.58, 5.04] },
+    other: { rb: [0.44, 0.48, 0.52, 0.54, 0.58, 0.62], bb: [0.56, 0.58, 0.60, 0.62, 0.64, 0.66] },
   },
   heavenGroup: {
-    other: [1 / 8.19, 1 / 8.19], // 全設定共通
-    cherry: [0.0625, 0.0816],
-    suika: [0.2500, 0.3263],
+    suika: { rb: [12.50, 13.26, 14.03, 14.79, 15.55, 16.31], bb: [12.50, 13.26, 14.03, 14.79, 15.55, 16.31] },
+    cherry: { rb: [0, 0, 0, 0, 0, 0], bb: [6.25, 6.63, 7.01, 7.39, 7.78, 8.16] },
+    other: { rb: [3.66, 3.66, 3.66, 3.66, 3.66, 3.66], bb: [8.54, 8.54, 8.54, 8.54, 8.54, 8.54] }, // 全設定共通
   },
 };
 
 // bucket: 'confirmed' | 'cherry' | 'suika' | 'other'（triggerBucket()の戻り値）
 function rollBonusTrigger(mode, bucket, setting) {
   if (bucket === 'confirmed') return true; // 中段チェリー・確定チェリー・確定役はBIG確定
-  const [min, max] = MODE_WIN_RATE_RANGES[modeGroupKey(mode)][bucket];
-  const p = interpolateBySetting(min, max, setting);
+  const { rb, bb } = WIN_RATE_TABLE[modeGroupKey(mode)][bucket];
+  const idx = setting - 1;
+  const p = (rb[idx] + bb[idx]) / 100;
   return Math.random() < p;
+}
+
+// 自然当選(bucket指定あり)のBIG/REG振り分け。
+// - confirmed(中段チェリー・確定チェリー・確定役)・cherryはBIG確定
+// - suikaはRB:BB=50:50固定
+// - otherはモード群・設定ごとの実測RB:BB比率
+function rollBonusTypeNatural(mode, bucket, setting) {
+  if (bucket === 'confirmed' || bucket === 'cherry') return 'big';
+  if (bucket === 'suika') return Math.random() < 0.5 ? 'reg' : 'big';
+  const { rb, bb } = WIN_RATE_TABLE[modeGroupKey(mode)].other;
+  const idx = setting - 1;
+  return Math.random() < rb[idx] / (rb[idx] + bb[idx]) ? 'reg' : 'big';
+}
+
+// 天井到達時のBIG/REG振り分け。
+// - 0G連・0G天井(天井G数が0)はBIG確定
+// - それ以外の通常のG数天井はRB40%:BB60%固定(設定によらない)
+function rollBonusTypeCeiling(priorCeiling) {
+  if (priorCeiling === 0) return 'big';
+  return Math.random() < 0.40 ? 'reg' : 'big';
 }
 
 // ===== モード移行抽選表の共通ヘルパー =====
@@ -404,6 +429,24 @@ const CEILING_GAMES = {
   hosho: 32, tengoku: 32, dokidoki: 32, superDokidoki: 32,
 };
 
+// モード滞在(gamesSinceLastBonusが0にリセットされた直後)ごとに、対象モードでは
+// probの確率で通常より短いgames天井を採用する。対象外のモード(通常A/B)は常に
+// CEILING_GAMES[mode]を使い、乱数を消費しない。
+const CEILING_EARLY_TRIGGER = {
+  hosho: { prob: 0.125, games: 0 },
+  tengoku: { prob: 0.125, games: 0 },
+  dokidoki: { prob: 0.125, games: 0 },
+  superDokidoki: { prob: 0.125, games: 0 },
+  hikimodoshi: { prob: 0.125, games: 100 },
+  chance: { prob: 0.125, games: 100 },
+};
+
+function rollCeiling(mode) {
+  const early = CEILING_EARLY_TRIGGER[mode];
+  if (early && Math.random() < early.prob) return early.games;
+  return CEILING_GAMES[mode];
+}
+
 // 超ドキドキ・ロングフリーズ発生率（当選契機役ごと、全設定共通）
 // 発生時は「BIG＋超ドキドキモード移行」が確定し、通常のBIG/REG抽選と
 // モード移行抽選をどちらもスキップする。
@@ -425,12 +468,13 @@ function playGame(state, setting) {
   let games = state.games + 1;
   let mode = state.mode;
   let gamesSinceLastBonus = state.gamesSinceLastBonus + 1;
+  let ceiling = state.ceiling;
   let bonus = null;
   let freeze = false;
 
   const bucket = triggerBucket(yaku);
   const naturalWin = rollBonusTrigger(state.mode, bucket, setting);
-  const ceilingWin = !naturalWin && gamesSinceLastBonus >= CEILING_GAMES[state.mode];
+  const ceilingWin = !naturalWin && gamesSinceLastBonus >= state.ceiling;
 
   if (naturalWin || ceilingWin) {
     const role = naturalWin ? transitionRole(yaku) : transitionRole('ceiling');
@@ -442,7 +486,9 @@ function playGame(state, setting) {
       type = 'big';
       mode = 'superDokidoki';
     } else {
-      type = rollBigOrReg(setting);
+      type = naturalWin
+        ? rollBonusTypeNatural(state.mode, bucket, setting)
+        : rollBonusTypeCeiling(state.ceiling);
       const dist = resolveModeTransition(state.mode, role, setting);
       const outcome = rollFromDistribution(dist);
       mode = outcome === 'stay' ? state.mode : outcome;
@@ -453,9 +499,10 @@ function playGame(state, setting) {
     games += payout.games;
     bonus = type;
     gamesSinceLastBonus = 0;
+    ceiling = rollCeiling(mode);
   }
 
-  return { state: { mode, medals, games, gamesSinceLastBonus }, bonus, yaku, freeze };
+  return { state: { mode, medals, games, gamesSinceLastBonus, ceiling }, bonus, yaku, freeze };
 }
 
 // initialState: { mode, medals, games }。totalGames到達までplayGameを繰り返す
@@ -490,8 +537,10 @@ if (typeof module !== 'undefined' && module.exports) {
     BONUS_PROB_TABLE,
     rollBigOrReg,
     modeGroupKey,
-    MODE_WIN_RATE_RANGES,
+    WIN_RATE_TABLE,
     rollBonusTrigger,
+    rollBonusTypeNatural,
+    rollBonusTypeCeiling,
     normalizeDistribution,
     rollFromDistribution,
     MODE_TRANSITION_TABLE,
@@ -502,6 +551,8 @@ if (typeof module !== 'undefined' && module.exports) {
     RESET_MODE_DISTRIBUTION,
     rollResetMode,
     CEILING_GAMES,
+    CEILING_EARLY_TRIGGER,
+    rollCeiling,
     FREEZE_PROB,
     playGame,
     simulate,

@@ -147,29 +147,52 @@ test('modeGroupKey maps the 8 internal modes to their 4 win-rate groups', () => 
   assert.equal(logic.modeGroupKey('superDokidoki'), 'heavenGroup');
 });
 
-test('MODE_WIN_RATE_RANGES has the 4 groups with other/cherry/suika ranges as probabilities (0-1)', () => {
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.other, [1 / 297.89, 1 / 234.06]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.cherry, [0.0092, 0.0168]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.normalAB.suika, [0.0366, 0.0519]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.hikimodoshi.other, [1 / 119.16, 1 / 93.62]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.hikimodoshi.cherry, [0.0229, 0.0420]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.hikimodoshi.suika, [0.0916, 0.1297]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.chance.other, [1 / 99.30, 1 / 78.02]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.chance.cherry, [0.0275, 0.0504]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.chance.suika, [0.1099, 0.1556]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.other, [1 / 8.19, 1 / 8.19]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.cherry, [0.0625, 0.0816]);
-  assert.deepEqual(logic.MODE_WIN_RATE_RANGES.heavenGroup.suika, [0.2500, 0.3263]);
+test('WIN_RATE_TABLE has RB/BB win rates (%) per mode group, role, and setting 1-6', () => {
+  assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.suika.rb, [1.83, 1.98, 2.14, 2.29, 2.44, 2.59]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.suika.bb, [1.83, 1.98, 2.14, 2.29, 2.44, 2.59]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.cherry.rb, [0, 0, 0, 0, 0, 0]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.normalAB.cherry.bb, [0.92, 1.07, 1.22, 1.37, 1.53, 1.68]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.heavenGroup.other.rb, [3.66, 3.66, 3.66, 3.66, 3.66, 3.66]);
+  assert.deepEqual(logic.WIN_RATE_TABLE.heavenGroup.other.bb, [8.54, 8.54, 8.54, 8.54, 8.54, 8.54]);
 });
 
 test('rollBonusTrigger: confirmed bucket always wins regardless of roll', () => {
   assert.equal(withMockRandom([0.999999], () => logic.rollBonusTrigger('normalA', 'confirmed', 1)), true);
 });
 
-test('rollBonusTrigger: other/cherry/suika buckets roll against the interpolated group rate', () => {
-  const p = logic.interpolateBySetting(...logic.MODE_WIN_RATE_RANGES.normalAB.cherry, 1);
+test('rollBonusTrigger: other/cherry/suika buckets roll against the exact per-setting rate (rb+bb)/100', () => {
+  const p = (logic.WIN_RATE_TABLE.normalAB.cherry.rb[0] + logic.WIN_RATE_TABLE.normalAB.cherry.bb[0]) / 100;
   assert.equal(withMockRandom([0], () => logic.rollBonusTrigger('normalA', 'cherry', 1)), true);
   assert.equal(withMockRandom([p + 0.0001], () => logic.rollBonusTrigger('normalA', 'cherry', 1)), false);
+});
+
+test('rollBonusTypeNatural: confirmed/cherry buckets are BIG-only', () => {
+  assert.equal(withMockRandom([0.999999], () => logic.rollBonusTypeNatural('normalA', 'confirmed', 1)), 'big');
+  assert.equal(withMockRandom([0.999999], () => logic.rollBonusTypeNatural('normalA', 'cherry', 1)), 'big');
+});
+
+test('rollBonusTypeNatural: suika bucket splits RB:BB exactly 50:50', () => {
+  assert.equal(withMockRandom([0.4999], () => logic.rollBonusTypeNatural('normalA', 'suika', 1)), 'reg');
+  assert.equal(withMockRandom([0.5], () => logic.rollBonusTypeNatural('normalA', 'suika', 1)), 'big');
+});
+
+test('rollBonusTypeNatural: other bucket splits by the mode-group\'s per-setting rb/(rb+bb) ratio', () => {
+  // normalAB.other setting1: rb=0.14, bb=0.18 -> rb share = 0.14/0.32 = 0.4375
+  const rbShare = logic.WIN_RATE_TABLE.normalAB.other.rb[0]
+    / (logic.WIN_RATE_TABLE.normalAB.other.rb[0] + logic.WIN_RATE_TABLE.normalAB.other.bb[0]);
+  assert.equal(withMockRandom([rbShare - 0.0001], () => logic.rollBonusTypeNatural('normalA', 'other', 1)), 'reg');
+  assert.equal(withMockRandom([rbShare], () => logic.rollBonusTypeNatural('normalA', 'other', 1)), 'big');
+});
+
+test('rollBonusTypeCeiling: 0G early ceiling is BIG-only', () => {
+  assert.equal(withMockRandom([0.999999], () => logic.rollBonusTypeCeiling(0)), 'big');
+});
+
+test('rollBonusTypeCeiling: a normal (non-zero) ceiling splits RB:BB fixed 40:60, independent of setting', () => {
+  assert.equal(withMockRandom([0.3999], () => logic.rollBonusTypeCeiling(1000)), 'reg');
+  assert.equal(withMockRandom([0.40], () => logic.rollBonusTypeCeiling(1000)), 'big');
+  assert.equal(withMockRandom([0.3999], () => logic.rollBonusTypeCeiling(32)), 'reg');
+  assert.equal(withMockRandom([0.3999], () => logic.rollBonusTypeCeiling(100)), 'reg');
 });
 
 test('normalizeDistribution adds a stay remainder when outcomes sum under 100', () => {
@@ -435,32 +458,33 @@ test('rollResetMode picks a starting mode from RESET_MODE_DISTRIBUTION', () => {
 });
 
 test('playGame: replay costs no medals and no bet (net 0), mode unchanged, no bonus', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 1000 };
   // r1=0 -> rollYaku(1) = 'replay'; r2 high -> rollBonusTrigger('normalA','other',1) = false
   const result = withMockRandom([0, 0.999999], () => logic.playGame(state, 1));
-  assert.deepEqual(result.state, { mode: 'normalA', medals: 0, games: 1, gamesSinceLastBonus: 1 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 0, games: 1, gamesSinceLastBonus: 1, ceiling: 1000 });
   assert.equal(result.bonus, null);
 });
 
 test('playGame: a miss costs the full bet (net -BET_MEDALS), no bonus', () => {
-  const state = { mode: 'normalA', medals: 100, games: 5, gamesSinceLastBonus: 10 };
+  const state = { mode: 'normalA', medals: 100, games: 5, gamesSinceLastBonus: 10, ceiling: 1000 };
   // r1=0.99999 -> rollYaku(1) = 'miss'; r2 high -> rollBonusTrigger('normalA','other',1) = false
   const result = withMockRandom([0.99999, 0.999999], () => logic.playGame(state, 1));
-  assert.deepEqual(result.state, { mode: 'normalA', medals: 97, games: 6, gamesSinceLastBonus: 11 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 97, games: 6, gamesSinceLastBonus: 11, ceiling: 1000 });
   assert.equal(result.bonus, null);
 });
 
 test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mode transition in one call', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 50 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 50, ceiling: 1000 };
   const cumBeforeKakuteiyaku = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1]
     + logic.COMMON_BELL_PROB[1] + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika;
   // r1 -> rollYaku(1) = 'kakuteiyaku' (confirmed bucket, rollBonusTrigger consumes no random)
   // r2=0.5 -> long-freeze roll fails (FREEZE_PROB.confirmed=0.05)
   // r3=0 -> rollBigOrReg(1) = 'big'
   // r4=0 -> rollFromDistribution({stay:45.31, normalB:25, tengoku:25, dokidoki:4.69}) = 'stay'
+  // mode stays normalA -> rollCeiling('normalA') has no early-trigger config, deterministic 1000, no extra draw
   const result = withMockRandom([cumBeforeKakuteiyaku + 0.0000001, 0.5, 0, 0], () => logic.playGame(state, 1));
   // trigger spin: payout 1 - BET_MEDALS(3) = -2; bonus: 70 games, +210 medals
-  assert.deepEqual(result.state, { mode: 'normalA', medals: 208, games: 71, gamesSinceLastBonus: 0 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: 208, games: 71, gamesSinceLastBonus: 0, ceiling: 1000 });
   assert.equal(result.bonus, 'big');
   assert.equal(result.yaku, 'kakuteiyaku');
   assert.equal(result.freeze, false);
@@ -473,32 +497,35 @@ test('FREEZE_PROB gives the long-freeze probability per winning-role bucket', ()
 });
 
 test('playGame: chudanCherry win + long-freeze roll succeeds -> forces BIG + superDokidoki', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 1000 };
   const cumBeforeChudanCherry = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
     + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku + logic.KOYAKU_PROB.kakuteiCherry;
   // r1 -> rollYaku(1) = 'chudanCherry' (confirmed bucket, rollBonusTrigger consumes no random)
   // r2=0 -> long-freeze roll succeeds (FREEZE_PROB.chudanCherry=0.50) -> forces BIG + superDokidoki,
   //          skipping rollBigOrReg/resolveModeTransition entirely
-  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0], () => logic.playGame(state, 1));
-  assert.deepEqual(result.state, { mode: 'superDokidoki', medals: 208, games: 71, gamesSinceLastBonus: 0 });
+  // r3=0.99 -> rollCeiling('superDokidoki'): 0.99 >= 0.125 -> no early trigger -> CEILING_GAMES.superDokidoki=32
+  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0, 0.99], () => logic.playGame(state, 1));
+  assert.deepEqual(result.state, { mode: 'superDokidoki', medals: 208, games: 71, gamesSinceLastBonus: 0, ceiling: 32 });
   assert.equal(result.bonus, 'big');
   assert.equal(result.freeze, true);
 });
 
 test('playGame: chudanCherry win + long-freeze roll fails -> falls back to the normal BIG/REG + mode-transition roll', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 1000 };
   const cumBeforeChudanCherry = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
     + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku + logic.KOYAKU_PROB.kakuteiCherry;
-  // r1 -> 'chudanCherry'; r2=0.99 -> freeze fails; r3=0 -> rollBigOrReg(1)='big';
-  // r4=0 -> rollFromDistribution(normalA.chudanCherry: {tengoku:75, dokidoki:24.22, superDokidoki:0.78}) = 'tengoku'
-  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0.99, 0, 0], () => logic.playGame(state, 1));
-  assert.deepEqual(result.state, { mode: 'tengoku', medals: 208, games: 71, gamesSinceLastBonus: 0 });
+  // r1 -> 'chudanCherry'; r2=0.99 -> freeze fails; bucket='confirmed' so rollBonusTypeNatural
+  // returns 'big' without consuming a draw; r3=0 -> rollFromDistribution(normalA.chudanCherry:
+  // {tengoku:75, dokidoki:24.22, superDokidoki:0.78}) = 'tengoku'
+  // r4=0.99 -> rollCeiling('tengoku'): no early trigger -> CEILING_GAMES.tengoku=32
+  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0.99, 0, 0.99], () => logic.playGame(state, 1));
+  assert.deepEqual(result.state, { mode: 'tengoku', medals: 208, games: 71, gamesSinceLastBonus: 0, ceiling: 32 });
   assert.equal(result.bonus, 'big');
   assert.equal(result.freeze, false);
 });
 
 test('playGame: result.yaku reports the drawn role even on a losing (miss) spin', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 1000 };
   const result = withMockRandom([0.99999, 0.999999], () => logic.playGame(state, 1));
   assert.equal(result.yaku, 'miss');
 });
@@ -511,25 +538,52 @@ test('CEILING_GAMES has per-mode forced-win thresholds (setting-independent)', (
   });
 });
 
+test('CEILING_EARLY_TRIGGER: 12.5% chance of an early ceiling per mode-stay', () => {
+  assert.deepEqual(logic.CEILING_EARLY_TRIGGER, {
+    hosho: { prob: 0.125, games: 0 },
+    tengoku: { prob: 0.125, games: 0 },
+    dokidoki: { prob: 0.125, games: 0 },
+    superDokidoki: { prob: 0.125, games: 0 },
+    hikimodoshi: { prob: 0.125, games: 100 },
+    chance: { prob: 0.125, games: 100 },
+  });
+});
+
+test('rollCeiling: modes without an early-trigger config always return CEILING_GAMES, no random draw consumed', () => {
+  assert.equal(withMockRandom([], () => logic.rollCeiling('normalA')), 1000);
+  assert.equal(withMockRandom([], () => logic.rollCeiling('normalB')), 1000);
+});
+
+test('rollCeiling: modes with an early-trigger config roll 12.5% early / 87.5% CEILING_GAMES', () => {
+  assert.equal(withMockRandom([0], () => logic.rollCeiling('hosho')), 0);
+  assert.equal(withMockRandom([0.124999], () => logic.rollCeiling('hosho')), 0);
+  assert.equal(withMockRandom([0.125], () => logic.rollCeiling('hosho')), 32);
+  assert.equal(withMockRandom([0.99], () => logic.rollCeiling('hosho')), 32);
+  assert.equal(withMockRandom([0], () => logic.rollCeiling('hikimodoshi')), 100);
+  assert.equal(withMockRandom([0.99], () => logic.rollCeiling('hikimodoshi')), 200);
+});
+
 test('playGame: reaching the mode ceiling forces a win even when the natural roll misses', () => {
-  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 999 };
+  const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 999, ceiling: 1000 };
   // r1=0.99999 -> rollYaku(1) = 'miss'; r2 high -> natural rollBonusTrigger = false
-  // gamesSinceLastBonus becomes 1000 === CEILING_GAMES.normalA -> forced win
-  // r3=0 -> rollBigOrReg(1) = 'big'
+  // gamesSinceLastBonus becomes 1000 === state.ceiling -> forced win
+  // r3=0.40 -> rollBonusTypeCeiling(1000): ceiling!=0 -> fixed 40:60 split, 0.40 is not < 0.40 -> 'big'
   // r4=0 -> rollFromDistribution(normalA.other dist, setting1) = first key ('normalB')
-  const result = withMockRandom([0.99999, 0.999999, 0, 0], () => logic.playGame(state, 1));
+  // mode->normalB has no early-trigger config -> rollCeiling deterministic 1000, no extra draw
+  const result = withMockRandom([0.99999, 0.999999, 0.40, 0], () => logic.playGame(state, 1));
   assert.equal(result.bonus, 'big');
-  assert.deepEqual(result.state, { mode: 'normalB', medals: -3 + 210, games: 1 + 70, gamesSinceLastBonus: 0 });
+  assert.deepEqual(result.state,
+    { mode: 'normalB', medals: -3 + 210, games: 1 + 70, gamesSinceLastBonus: 0, ceiling: 1000 });
 });
 
 test('simulate: runs playGame until the cumulative game count reaches totalGames, tallying BIG/REG', () => {
-  const initialState = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const initialState = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 1000 };
   // r1=0 -> rollYaku(1)='replay'; r2 high -> no bonus (games: 0->1)
   // r3=0.99999 -> rollYaku(1)='miss'; r4 high -> no bonus (games: 1->2, medals: 0-3=-3)
   const result = withMockRandom(
     [0, 0.999999, 0.99999, 0.999999],
     () => logic.simulate(1, initialState, 2)
   );
-  assert.deepEqual(result.state, { mode: 'normalA', medals: -3, games: 2, gamesSinceLastBonus: 2 });
+  assert.deepEqual(result.state, { mode: 'normalA', medals: -3, games: 2, gamesSinceLastBonus: 2, ceiling: 1000 });
   assert.deepEqual(result.stats, { bigCount: 0, regCount: 0 });
 });
