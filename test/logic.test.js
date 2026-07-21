@@ -73,12 +73,12 @@ test('rollYaku lands in a middle role interval, not just the endpoints', () => {
   assert.equal(withMockRandom([afterReplayAndBell + 0.00001], () => logic.rollYaku(1)), 'commonBell');
 });
 
-test('MISS_PAYOUT_SHARE moves 15% of the residual (post-named-role) probability to a 1-medal payout', () => {
-  assert.equal(logic.MISS_PAYOUT_SHARE, 0.15);
+test('MISS_PAYOUT_SHARE moves 25% of the residual (post-named-role) probability to a 1-medal payout', () => {
+  assert.equal(logic.MISS_PAYOUT_SHARE, 0.25);
   assert.equal(logic.KOYAKU_PAYOUT.missPayout, 1);
 });
 
-test('rollYaku splits the residual into missPayout(15%) then miss(85%)', () => {
+test('rollYaku splits the residual into missPayout(25%) then miss(75%)', () => {
   const namedCum = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
     + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku
     + logic.KOYAKU_PROB.kakuteiCherry + logic.KOYAKU_PROB.chudanCherry;

@@ -52,7 +52,7 @@ const KOYAKU_PAYOUT = {
 
 // コイン持ち調整用: 名前付き役に当たらなかった残り(ハズレ相当)のうち、
 // この割合を1枚払い出し(missPayout)に振り分け、残りを完全ハズレ(miss)とする。
-const MISS_PAYOUT_SHARE = 0.15;
+const MISS_PAYOUT_SHARE = 0.25;
 
 // 1G分の成立役抽選（BIG/REG自体はここでは決めない。契機役の判定のみ）
 const YAKU_ORDER = [
