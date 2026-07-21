@@ -205,15 +205,22 @@ test('normalA chudanCherry/confirmed transitions are fixed', () => {
     { stay: 45.31, normalB: 25.00, tengoku: 25.00, dokidoki: 4.69 });
 });
 
-test('normalA suika transition: odd settings fixed, even settings ranged, with setting3/6 exceptions', () => {
+test('normalA suika transition: odd settings fixed, even settings ranged, with setting3/5 exceptions', () => {
+  // ユーザー提供の実測データ(設定1-6)と照合済み。天国23.44%の例外は設定6ではなく設定5に付く。
   assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 1),
     { normalB: 50.00, tengoku: 20.31, dokidoki: 1.56, stay: 28.13 });
-  assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 3),
-    { normalB: 50.00, tengoku: 21.88, dokidoki: 1.56, stay: 26.56 });
   assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 2),
     { normalB: 57.81, tengoku: 20.31, dokidoki: 1.56, stay: 20.32 });
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 3),
+    { normalB: 50.00, tengoku: 21.88, dokidoki: 1.56, stay: 26.56 });
+  const s4 = logic.resolveModeTransition('normalA', 'suika', 4);
+  assert.equal(s4.tengoku, 20.31);
+  assert.ok(Math.abs(s4.normalB - 59.375) < 1e-9);
+  assert.equal(s4.dokidoki, 1.56);
+  assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 5),
+    { normalB: 50.00, tengoku: 23.44, dokidoki: 1.56, stay: 25.00 });
   assert.deepEqual(logic.resolveModeTransition('normalA', 'suika', 6),
-    { normalB: 60.94, tengoku: 23.44, dokidoki: 1.56, stay: 14.06 });
+    { normalB: 60.94, tengoku: 20.31, dokidoki: 1.56, stay: 17.19 });
 });
 
 test('normalA other (cherry falls back to it too) is ranged with a fixed dokidoki', () => {

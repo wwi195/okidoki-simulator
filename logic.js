@@ -217,7 +217,7 @@ const MODE_TRANSITION_TABLE = {
       type: 'oddEven',
       odd: { type: 'fixed', outcomes: { normalB: 50.00, tengoku: 20.31, dokidoki: 1.56 } },
       even: { type: 'range', ranges: { normalB: [57.81, 60.94] }, fixed: { tengoku: 20.31, dokidoki: 1.56 } },
-      exceptions: { 3: { tengoku: 21.88 }, 6: { tengoku: 23.44 } },
+      exceptions: { 3: { tengoku: 21.88 }, 5: { tengoku: 23.44 } },
     },
     other: { type: 'range', ranges: { normalB: [25.00, 39.06], tengoku: [10.16, 11.72] }, fixed: { dokidoki: 0.78 } },
   },
