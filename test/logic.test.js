@@ -490,10 +490,14 @@ test('playGame: a confirmed-bucket win (kakuteiyaku) resolves BIG payout and mod
   assert.equal(result.freeze, false);
 });
 
-test('FREEZE_PROB gives the long-freeze probability per winning-role bucket', () => {
+test('FREEZE_PROB gives the long-freeze probability per winning-role bucket (natural wins)', () => {
   assert.deepEqual(logic.FREEZE_PROB, {
-    chudanCherry: 0.50, confirmed: 0.05, cherry: 0.0156, suika: 0.0156, other: 0,
+    chudanCherry: 0.50, confirmed: 0.05, cherry: 0.0156, suika: 0.0156, other: 0.0006,
   });
+});
+
+test('FREEZE_PROB_CEILING is the long-freeze probability for any ceiling-triggered win (G数当選)', () => {
+  assert.equal(logic.FREEZE_PROB_CEILING, 0.0003);
 });
 
 test('playGame: chudanCherry win + long-freeze roll succeeds -> forces BIG + superDokidoki', () => {
@@ -502,12 +506,32 @@ test('playGame: chudanCherry win + long-freeze roll succeeds -> forces BIG + sup
     + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku + logic.KOYAKU_PROB.kakuteiCherry;
   // r1 -> rollYaku(1) = 'chudanCherry' (confirmed bucket, rollBonusTrigger consumes no random)
   // r2=0 -> long-freeze roll succeeds (FREEZE_PROB.chudanCherry=0.50) -> forces BIG + superDokidoki,
-  //          skipping rollBigOrReg/resolveModeTransition entirely
-  // r3=0.99 -> rollCeiling('superDokidoki'): 0.99 >= 0.125 -> no early trigger -> CEILING_GAMES.superDokidoki=32
-  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0, 0.99], () => logic.playGame(state, 1));
-  assert.deepEqual(result.state, { mode: 'superDokidoki', medals: 208, games: 71, gamesSinceLastBonus: 0, ceiling: 32 });
+  //          skipping rollBonusTypeNatural/resolveModeTransition entirely
+  // ceiling is forced to 0 (guaranteed 0G連 on the very next spin), no rollCeiling draw consumed
+  const result = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0], () => logic.playGame(state, 1));
+  assert.deepEqual(result.state, { mode: 'superDokidoki', medals: 208, games: 71, gamesSinceLastBonus: 0, ceiling: 0 });
   assert.equal(result.bonus, 'big');
   assert.equal(result.freeze, true);
+});
+
+test('playGame: freeze-forced ceiling(0) guarantees a BIG on the very next spin regardless of the roll (0G連)', () => {
+  // spin 1: freeze succeeds -> mode=superDokidoki, ceiling=0
+  const state1 = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: 1000 };
+  const cumBeforeChudanCherry = logic.KOYAKU_PROB.replay + logic.FIRST_BELL_PROB[1] + logic.COMMON_BELL_PROB[1]
+    + logic.KOYAKU_PROB.cherry + logic.KOYAKU_PROB.suika + logic.KOYAKU_PROB.kakuteiyaku + logic.KOYAKU_PROB.kakuteiCherry;
+  const result1 = withMockRandom([cumBeforeChudanCherry + 0.0000001, 0], () => logic.playGame(state1, 1));
+  assert.equal(result1.state.ceiling, 0);
+
+  // spin 2 (0G連): even with a yaku roll and a freeze roll that would normally not win/freeze,
+  // isZeroCeiling forces a win, and rollBonusTypeCeiling(0) forces BIG.
+  // r1=0.99999 -> rollYaku(1)='miss' (irrelevant, bonus trigger is bypassed by isZeroCeiling)
+  // r2=0.99 -> long-freeze roll for the ceiling path (FREEZE_PROB_CEILING=0.0003) fails
+  // r3=0 -> rollFromDistribution(superDokidoki.other: {stay:90.63, hosho:9.38}) = 'stay' (superDokidoki)
+  // r4=0.99 -> rollCeiling('superDokidoki'): no early trigger -> 32
+  const result2 = withMockRandom([0.99999, 0.99, 0, 0.99], () => logic.playGame(result1.state, 1));
+  assert.equal(result2.bonus, 'big');
+  assert.deepEqual(result2.state,
+    { mode: 'superDokidoki', medals: result1.state.medals - 3 + 210, games: result1.state.games + 1 + 70, gamesSinceLastBonus: 0, ceiling: 32 });
 });
 
 test('playGame: chudanCherry win + long-freeze roll fails -> falls back to the normal BIG/REG + mode-transition roll', () => {
@@ -567,10 +591,11 @@ test('playGame: reaching the mode ceiling forces a win even when the natural rol
   const state = { mode: 'normalA', medals: 0, games: 0, gamesSinceLastBonus: 999, ceiling: 1000 };
   // r1=0.99999 -> rollYaku(1) = 'miss'; r2 high -> natural rollBonusTrigger = false
   // gamesSinceLastBonus becomes 1000 === state.ceiling -> forced win
-  // r3=0.40 -> rollBonusTypeCeiling(1000): ceiling!=0 -> fixed 40:60 split, 0.40 is not < 0.40 -> 'big'
-  // r4=0 -> rollFromDistribution(normalA.other dist, setting1) = first key ('normalB')
+  // r3=0.99 -> long-freeze roll for the ceiling path (FREEZE_PROB_CEILING=0.0003) fails
+  // r4=0.40 -> rollBonusTypeCeiling(1000): ceiling!=0 -> fixed 40:60 split, 0.40 is not < 0.40 -> 'big'
+  // r5=0 -> rollFromDistribution(normalA.other dist, setting1) = first key ('normalB')
   // mode->normalB has no early-trigger config -> rollCeiling deterministic 1000, no extra draw
-  const result = withMockRandom([0.99999, 0.999999, 0.40, 0], () => logic.playGame(state, 1));
+  const result = withMockRandom([0.99999, 0.999999, 0.99, 0.40, 0], () => logic.playGame(state, 1));
   assert.equal(result.bonus, 'big');
   assert.deepEqual(result.state,
     { mode: 'normalB', medals: -3 + 210, games: 1 + 70, gamesSinceLastBonus: 0, ceiling: 1000 });

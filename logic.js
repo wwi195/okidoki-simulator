@@ -447,16 +447,19 @@ function rollCeiling(mode) {
   return CEILING_GAMES[mode];
 }
 
-// 超ドキドキ・ロングフリーズ発生率（当選契機役ごと、全設定共通）
-// 発生時は「BIG＋超ドキドキモード移行」が確定し、通常のBIG/REG抽選と
-// モード移行抽選をどちらもスキップする。
+// 超ドキドキ・ロングフリーズ発生率（自然当選の契機役ごと、全設定共通）
+// 発生時は「BIG＋超ドキドキモード移行＋次回0G連BIG確定」が確定し、通常の
+// BIG/REG抽選とモード移行抽選をどちらもスキップする。
 const FREEZE_PROB = {
   chudanCherry: 0.50,
   confirmed: 0.05,
   cherry: 0.0156,
   suika: 0.0156,
-  other: 0,
+  other: 0.0006, // 上記以外(自然当選)
 };
+
+// 天井（G数当選）契機でのロングフリーズ発生率。0G連による強制当選も含む。
+const FREEZE_PROB_CEILING = 0.0003;
 
 // state: { mode, medals, games, gamesSinceLastBonus }
 // 戻り値: { state: 更新後state, bonus: null | 'big' | 'reg', freeze: 超ドキ・ロングフリーズが発生したか }
@@ -473,12 +476,14 @@ function playGame(state, setting) {
   let freeze = false;
 
   const bucket = triggerBucket(yaku);
-  const naturalWin = rollBonusTrigger(state.mode, bucket, setting);
-  const ceilingWin = !naturalWin && gamesSinceLastBonus >= state.ceiling;
+  // ceilingが0(通常のG数天井到達、または0G連・0G天井)の場合は自然抽選を待たず強制当選
+  const isZeroCeiling = state.ceiling === 0;
+  const naturalWin = !isZeroCeiling && rollBonusTrigger(state.mode, bucket, setting);
+  const ceilingWin = isZeroCeiling || (!naturalWin && gamesSinceLastBonus >= state.ceiling);
 
   if (naturalWin || ceilingWin) {
     const role = naturalWin ? transitionRole(yaku) : transitionRole('ceiling');
-    const freezeProb = FREEZE_PROB[role] || 0;
+    const freezeProb = naturalWin ? (FREEZE_PROB[role] || 0) : FREEZE_PROB_CEILING;
     freeze = freezeProb > 0 && Math.random() < freezeProb;
 
     let type;
@@ -499,7 +504,8 @@ function playGame(state, setting) {
     games += payout.games;
     bonus = type;
     gamesSinceLastBonus = 0;
-    ceiling = rollCeiling(mode);
+    // フリーズ発生時は次回0G連(次G必ずBIG確定)を保証するため、通常の確率的天井抽選をスキップする
+    ceiling = freeze ? 0 : rollCeiling(mode);
   }
 
   return { state: { mode, medals, games, gamesSinceLastBonus, ceiling }, bonus, yaku, freeze };
@@ -554,6 +560,7 @@ if (typeof module !== 'undefined' && module.exports) {
     CEILING_EARLY_TRIGGER,
     rollCeiling,
     FREEZE_PROB,
+    FREEZE_PROB_CEILING,
     playGame,
     simulate,
   };
