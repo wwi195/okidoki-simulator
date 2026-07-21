@@ -179,6 +179,7 @@
     <div class="stat"><div class="value" id="statFreezePeak">-</div><div class="label">超ドキ滞在<br>最高獲得枚数</div></div>
     <div class="stat"><div class="value" id="statMedals">-</div><div class="label">最終差枚</div></div>
     <div class="stat"><div class="value" id="statGames">-</div><div class="label">消化G数</div></div>
+    <div class="stat"><div class="value" id="statKikaiwari">-</div><div class="label">機械割</div></div>
   </div>
   <svg id="slumpGraph" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
 </div>
@@ -290,6 +291,7 @@ function resetAll() {
   document.getElementById('statFreezePeak').textContent = '-';
   document.getElementById('statMedals').textContent = '-';
   document.getElementById('statGames').textContent = '-';
+  document.getElementById('statKikaiwari').textContent = '-';
 }
 
 document.getElementById('resetBtn').addEventListener('click', resetAll);
@@ -445,6 +447,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
 
   while (state.games < totalGames) {
     const wasElevated = ELEVATED_MODES.has(state.mode);
+    const preSpinMedals = state.medals;
     const result = playGame(state, setting);
     state = result.state;
     if (result.bonus === 'big') batchBig++;
@@ -457,7 +460,10 @@ document.getElementById('runBtn').addEventListener('click', () => {
 
     const nowElevated = ELEVATED_MODES.has(state.mode);
     if (nowElevated && !wasElevated) {
-      session = { startMedals: state.medals, hadFreeze: false, peakGain: 0 };
+      // セッション開始直前(このスピン前)の差枚を基準にする。ここをstate.medals
+      // (このスピン後の値)にすると、フリーズで直接superDokidokiに入った
+      // そのスピン自体の獲得分(BIGの+210枚など)がpeakGainに反映されない。
+      session = { startMedals: preSpinMedals, hadFreeze: false, peakGain: 0 };
     }
     if (nowElevated && session) {
       if (result.freeze) session.hadFreeze = true;
@@ -482,6 +488,12 @@ document.getElementById('runBtn').addEventListener('click', () => {
   document.getElementById('statFreezePeak').textContent = batchFreeze > 0 ? `+${bestFreezeSessionPeak}` : '-';
   document.getElementById('statMedals').textContent = state.medals;
   document.getElementById('statGames').textContent = state.games;
+  // 機械割(%) = 総払出枚数 ÷ 総投入枚数 × 100
+  // 総投入枚数(アウト) = 消化G数 × BET_MEDALS (リプレイも「3枚賭けて3枚払い戻し」でカウント)
+  // 総払出枚数(セーフ) = 総投入枚数 + 差枚
+  const totalIn = state.games * BET_MEDALS;
+  document.getElementById('statKikaiwari').textContent =
+    totalIn > 0 ? `${(((totalIn + state.medals) / totalIn) * 100).toFixed(2)}%` : '-';
   drawSlumpGraph(history, freezes);
 });
 
