@@ -80,6 +80,13 @@
   .win-display.miss { color: var(--muted); font-weight: normal; }
   .chain-display { text-align: center; font-size: 13px; font-weight: bold; color: var(--coral); margin-bottom: 8px; }
   .bonus-gap-display { text-align: center; font-size: 12px; color: var(--muted); margin: 6px 0; }
+  .kana-lamp {
+    text-align: center; font-size: 14px; font-weight: bold; color: var(--gold);
+    margin: 6px 0; padding: 6px; border-radius: 6px;
+    background: rgba(255,209,102,0.12); border: 1px solid var(--gold);
+    animation: kanaLampBlink 0.6s ease-in-out infinite alternate;
+  }
+  @keyframes kanaLampBlink { from { opacity: 0.4; } to { opacity: 1; } }
   .medal-bar { background: var(--bg); border: 1px solid #23485a; border-radius: 8px; padding: 10px 14px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
   .medal-label { font-size: 11px; color: var(--muted); }
   .medal-count { font-size: 20px; font-weight: bold; color: var(--gold); }
@@ -153,6 +160,7 @@
     <div class="result-icon" id="r3">🌺</div>
   </div>
   <div class="bonus-gap-display" id="bonusGapDisplay">ボーナス間: 0G</div>
+  <div class="kana-lamp" id="kanaLamp" style="display:none;">💡 カナちゃんランプ点灯中！</div>
   <div class="win-display miss" id="winDisplay">投資してスタート</div>
   <div class="chain-display" id="chainDisplay" style="display:none;"></div>
   <div class="medal-bar">
@@ -189,6 +197,7 @@
     <div class="stat"><div class="value" id="statGames">-</div><div class="label">消化G数</div></div>
     <div class="stat"><div class="value" id="statKikaiwari">-</div><div class="label">機械割</div></div>
     <div class="stat"><div class="value" id="statYenBalance">-</div><div class="label">収支（円換算）</div></div>
+    <div class="stat"><div class="value" id="statHeldMedals">-</div><div class="label">所持メダル</div></div>
   </div>
   <button class="secondary" id="statsDetailToggle" style="margin-bottom:8px;">詳細を表示 ▼</button>
   <div class="stats" id="statsDetail" style="display:none;">
@@ -310,6 +319,9 @@ function renderPlayScreen() {
   document.getElementById('spinBtn').disabled = !canSpin;
   document.getElementById('skipBtn').disabled = !canSpin;
   document.getElementById('bonusGapDisplay').textContent = `ボーナス間: ${state.gamesSinceLastBonus}G`;
+  // 0G天井(通常の0G天井抽選、またはフリーズによる0G連ストック)が成立している間は
+  // 次の1Gで当選確定なので、その予告としてランプを点灯させる
+  document.getElementById('kanaLamp').style.display = state.ceiling === 0 ? '' : 'none';
   renderWallet();
 }
 
@@ -358,6 +370,7 @@ function resetAll() {
   const yenEl = document.getElementById('statYenBalance');
   yenEl.textContent = '-';
   yenEl.style.color = '';
+  document.getElementById('statHeldMedals').textContent = '-';
   updateChainDisplay();
 }
 
@@ -613,6 +626,8 @@ document.getElementById('runBtn').addEventListener('click', () => {
   const yenEl = document.getElementById('statYenBalance');
   yenEl.textContent = yen < 0 ? `-¥${Math.abs(yen).toLocaleString()}` : `¥${yen.toLocaleString()}`;
   yenEl.style.color = yen < 0 ? '#ff4444' : '';
+  // 所持メダル = 5,000円単位の追加投資で床打ちした後の実質メダル数(state.medals)
+  document.getElementById('statHeldMedals').textContent = `${state.medals}枚`;
   drawSlumpGraph(history, freezes);
 });
 
