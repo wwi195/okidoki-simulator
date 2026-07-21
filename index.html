@@ -572,6 +572,25 @@ document.getElementById('runBtn').addEventListener('click', () => {
   bigCount += batchBig;
   regCount += batchReg;
 
+  // 統計(最終差枚・機械割)には生の差枚をそのまま使う。一方、途中で差枚が0を
+  // 下回った分は実際には都度追加投資して遊技を続けた想定になるため、履歴を
+  // 辿って0で床打ちしたシミュレーションをやり直し、そのシミュレーション上の
+  // 最終メダル数と実質投資額を求める。最終差枚がプラスでも、その過程で一度でも
+  // マイナスに落ち込んでいれば、所持金はその分減っているはずなので、最終値
+  // だけを見て判定すると所持金の減少を見逃してしまう。
+  const rawFinalMedals = state.medals;
+  let shadowMedals = 0;
+  let bankedDeficit = 0;
+  for (let i = 1; i < history.length; i++) {
+    shadowMedals += history[i].medals - history[i - 1].medals;
+    if (shadowMedals < 0) {
+      bankedDeficit += shadowMedals;
+      shadowMedals = 0;
+    }
+  }
+  wallet += bankedDeficit * MEDAL_UNIT_PRICE;
+  state.medals = shadowMedals;
+
   renderStatus();
   renderPlayScreen();
   document.getElementById('statBig').textContent = batchBig;
@@ -579,16 +598,16 @@ document.getElementById('runBtn').addEventListener('click', () => {
   document.getElementById('statFreeze').textContent = batchFreeze;
   document.getElementById('statFreezePeak').textContent = batchFreeze > 0 ? `+${bestFreezeSessionPeak}` : '-';
   document.getElementById('statRenchan').textContent = bestChain > 0 ? bestChain : '-';
-  document.getElementById('statMedals').textContent = state.medals;
+  document.getElementById('statMedals').textContent = rawFinalMedals;
   document.getElementById('statGames').textContent = state.games;
   // 機械割(%) = 総払出枚数 ÷ 総投入枚数 × 100
   // 総投入枚数(アウト) = 消化G数 × BET_MEDALS (リプレイも「3枚賭けて3枚払い戻し」でカウント)
-  // 総払出枚数(セーフ) = 総投入枚数 + 差枚
+  // 総払出枚数(セーフ) = 総投入枚数 + 差枚(生値)
   const totalIn = state.games * BET_MEDALS;
   document.getElementById('statKikaiwari').textContent =
-    totalIn > 0 ? `${(((totalIn + state.medals) / totalIn) * 100).toFixed(2)}%` : '-';
-  // 収支(円換算) = 差枚 × MEDAL_UNIT_PRICE。マイナスなら実際に使った金額として赤字表示
-  const yen = state.medals * MEDAL_UNIT_PRICE;
+    totalIn > 0 ? `${(((totalIn + rawFinalMedals) / totalIn) * 100).toFixed(2)}%` : '-';
+  // 収支(円換算) = 生の差枚 × MEDAL_UNIT_PRICE。マイナスなら実際に使った金額として赤字表示
+  const yen = rawFinalMedals * MEDAL_UNIT_PRICE;
   const yenEl = document.getElementById('statYenBalance');
   yenEl.textContent = yen < 0 ? `-¥${Math.abs(yen).toLocaleString()}` : `¥${yen.toLocaleString()}`;
   yenEl.style.color = yen < 0 ? '#ff4444' : '';
