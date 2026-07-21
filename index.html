@@ -176,10 +176,16 @@
     <div class="stat"><div class="value" id="statBig">-</div><div class="label">BIG回数</div></div>
     <div class="stat"><div class="value" id="statReg">-</div><div class="label">REG回数</div></div>
     <div class="stat"><div class="value" id="statFreeze">-</div><div class="label">超ドキ<br>ロングフリーズ</div></div>
-    <div class="stat"><div class="value" id="statFreezePeak">-</div><div class="label">超ドキ滞在<br>最高獲得枚数</div></div>
     <div class="stat"><div class="value" id="statMedals">-</div><div class="label">最終差枚</div></div>
     <div class="stat"><div class="value" id="statGames">-</div><div class="label">消化G数</div></div>
+  </div>
+  <div class="stats">
     <div class="stat"><div class="value" id="statKikaiwari">-</div><div class="label">機械割</div></div>
+  </div>
+  <button class="secondary" id="statsDetailToggle" style="margin-bottom:8px;">詳細を表示 ▼</button>
+  <div class="stats" id="statsDetail" style="display:none;">
+    <div class="stat"><div class="value" id="statFreezePeak">-</div><div class="label">超ドキ滞在<br>最高獲得枚数</div></div>
+    <div class="stat"><div class="value" id="statRenchan">-</div><div class="label">連チャン最高数<br>（32G以内）</div></div>
   </div>
   <svg id="slumpGraph" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
 </div>
@@ -240,7 +246,8 @@ let cashOutCount = 0;
 let pendingResult = null; // 当選確定演出待ちのplayGame結果
 
 function initState() {
-  state = { mode: rollResetMode(), medals: 0, games: 0, gamesSinceLastBonus: 0 };
+  const mode = rollResetMode();
+  state = { mode, medals: 0, games: 0, gamesSinceLastBonus: 0, ceiling: rollCeiling(mode) };
   renderStatus();
   renderPlayScreen();
 }
@@ -251,7 +258,7 @@ function currentSetting() {
 
 function renderStatus() {
   const el = document.getElementById('status');
-  el.innerHTML = `モード: <b>${MODE_LABELS[state.mode] || state.mode}</b> / 差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, CEILING_GAMES[state.mode] - state.gamesSinceLastBonus)}</b>`;
+  el.innerHTML = `モード: <b>${MODE_LABELS[state.mode] || state.mode}</b> / 差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, state.ceiling - state.gamesSinceLastBonus)}</b>`;
 }
 
 function renderPlayScreen() {
@@ -289,10 +296,19 @@ function resetAll() {
   document.getElementById('statReg').textContent = '-';
   document.getElementById('statFreeze').textContent = '-';
   document.getElementById('statFreezePeak').textContent = '-';
+  document.getElementById('statRenchan').textContent = '-';
   document.getElementById('statMedals').textContent = '-';
   document.getElementById('statGames').textContent = '-';
   document.getElementById('statKikaiwari').textContent = '-';
 }
+
+document.getElementById('statsDetailToggle').addEventListener('click', () => {
+  const detail = document.getElementById('statsDetail');
+  const toggle = document.getElementById('statsDetailToggle');
+  const showing = detail.style.display !== 'none';
+  detail.style.display = showing ? 'none' : 'flex';
+  toggle.textContent = showing ? '詳細を表示 ▼' : '詳細を隠す ▲';
+});
 
 document.getElementById('resetBtn').addEventListener('click', resetAll);
 document.getElementById('setting').addEventListener('change', resetAll);
@@ -442,12 +458,15 @@ document.getElementById('runBtn').addEventListener('click', () => {
   let batchFreeze = 0;
   let bestFreezeSessionPeak = 0;
   let session = null; // { startMedals, hadFreeze, peakGain }
+  let chainCount = 0;
+  let bestChain = 0;
   const history = [{ games: state.games, medals: state.medals }];
   const freezes = [];
 
   while (state.games < totalGames) {
     const wasElevated = ELEVATED_MODES.has(state.mode);
     const preSpinMedals = state.medals;
+    const preSpinGap = state.gamesSinceLastBonus;
     const result = playGame(state, setting);
     state = result.state;
     if (result.bonus === 'big') batchBig++;
@@ -455,6 +474,11 @@ document.getElementById('runBtn').addEventListener('click', () => {
     if (result.freeze) {
       batchFreeze++;
       freezes.push({ games: state.games, medals: state.medals });
+    }
+    if (result.bonus) {
+      // 前回ボーナスからこのボーナスまでのG数(このスピン自体を含む)が32G以内なら連チャン継続
+      chainCount = (preSpinGap + 1) <= 32 ? chainCount + 1 : 1;
+      bestChain = Math.max(bestChain, chainCount);
     }
     history.push({ games: state.games, medals: state.medals });
 
@@ -486,6 +510,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
   document.getElementById('statReg').textContent = batchReg;
   document.getElementById('statFreeze').textContent = batchFreeze;
   document.getElementById('statFreezePeak').textContent = batchFreeze > 0 ? `+${bestFreezeSessionPeak}` : '-';
+  document.getElementById('statRenchan').textContent = bestChain > 0 ? bestChain : '-';
   document.getElementById('statMedals').textContent = state.medals;
   document.getElementById('statGames').textContent = state.games;
   // 機械割(%) = 総払出枚数 ÷ 総投入枚数 × 100
