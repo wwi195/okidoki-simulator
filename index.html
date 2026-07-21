@@ -7,12 +7,12 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --bg: #0d2b3a; --panel: #0a1f2b; --pink: #ff6f91; --coral: #ff9166;
-    --teal: #2ee6c5; --gold: #ffd166; --text: #eef7f6; --muted: #7fa3ad;
+    --bg: #120a0a; --panel: #0c0707; --pink: #ff3b4e; --coral: #ff6b4e;
+    --teal: #2ee6c5; --gold: #ffd166; --text: #f2e6e6; --muted: #8a6b6b;
   }
   body {
     background: var(--bg);
-    background-image: radial-gradient(ellipse at 50% 0%, rgba(255,111,145,0.18) 0%, transparent 60%);
+    background-image: radial-gradient(ellipse at 50% 0%, rgba(220,20,30,0.35) 0%, transparent 60%);
     color: var(--text); font-family: -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
     min-height: 100vh; padding: 16px;
   }
@@ -298,6 +298,13 @@ function trackChain(gap, preSpinMedals) {
 }
 
 function renderPlayScreen() {
+  // 所持メダルはマイナスになりえない(分析タブの一括シミュレーションはメダル切れを
+  // 考慮せず差枚がマイナスのまま進む)。マイナス分は所持金から補填したことにして
+  // メダルは0に清算する。
+  if (state.medals < 0) {
+    wallet += state.medals * MEDAL_UNIT_PRICE;
+    state.medals = 0;
+  }
   document.getElementById('medalCount').textContent = `${state.medals}枚`;
   const canSpin = state.medals >= BET_MEDALS && !pendingResult;
   document.getElementById('spinBtn').disabled = !canSpin;
@@ -320,6 +327,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     renderStatus();
+    renderPlayScreen();
   });
 });
 
