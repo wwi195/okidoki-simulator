@@ -188,6 +188,7 @@
     <div class="stat"><div class="value" id="statMedals">-</div><div class="label">最終差枚</div></div>
     <div class="stat"><div class="value" id="statGames">-</div><div class="label">消化G数</div></div>
     <div class="stat"><div class="value" id="statKikaiwari">-</div><div class="label">機械割</div></div>
+    <div class="stat"><div class="value" id="statYenBalance">-</div><div class="label">収支（円換算）</div></div>
   </div>
   <button class="secondary" id="statsDetailToggle" style="margin-bottom:8px;">詳細を表示 ▼</button>
   <div class="stats" id="statsDetail" style="display:none;">
@@ -346,6 +347,9 @@ function resetAll() {
   document.getElementById('statMedals').textContent = '-';
   document.getElementById('statGames').textContent = '-';
   document.getElementById('statKikaiwari').textContent = '-';
+  const yenEl = document.getElementById('statYenBalance');
+  yenEl.textContent = '-';
+  yenEl.style.color = '';
   updateChainDisplay();
 }
 
@@ -575,6 +579,11 @@ document.getElementById('runBtn').addEventListener('click', () => {
   const totalIn = state.games * BET_MEDALS;
   document.getElementById('statKikaiwari').textContent =
     totalIn > 0 ? `${(((totalIn + state.medals) / totalIn) * 100).toFixed(2)}%` : '-';
+  // 収支(円換算) = 差枚 × MEDAL_UNIT_PRICE。マイナスなら実際に使った金額として赤字表示
+  const yen = state.medals * MEDAL_UNIT_PRICE;
+  const yenEl = document.getElementById('statYenBalance');
+  yenEl.textContent = yen < 0 ? `-¥${Math.abs(yen).toLocaleString()}` : `¥${yen.toLocaleString()}`;
+  yenEl.style.color = yen < 0 ? '#ff4444' : '';
   drawSlumpGraph(history, freezes);
 });
 
