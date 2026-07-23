@@ -265,6 +265,14 @@ let cashOutCount = 0;
 let pendingResult = null; // 当選確定演出待ちのplayGame結果
 let chainCount = 0; // 32G以内で繋がっている連チャン数
 let chainStartMedals = 0; // 連チャン開始時点の差枚(獲得枚数の基準)
+// プレイタブ・分析タブ両方の操作を通しで記録するグラフ用履歴。
+// タブを切り替えても、それまでの進行がスランプグラフに反映されるようにする。
+let fullHistory = [{ games: 0, medals: 0 }];
+let freezeMarkers = [];
+
+function trackHistory() {
+  fullHistory.push({ games: state.games, medals: state.medals });
+}
 
 function initState() {
   const mode = rollResetMode();
@@ -345,6 +353,7 @@ document.querySelectorAll('.tab-btn').forEach((btn) => {
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     renderStatus();
     renderPlayScreen();
+    if (btn.dataset.tab === 'batch') drawSlumpGraph(fullHistory, freezeMarkers);
   });
 });
 
@@ -357,6 +366,8 @@ function resetAll() {
   pendingResult = null;
   chainCount = 0;
   chainStartMedals = 0;
+  fullHistory = [{ games: 0, medals: 0 }];
+  freezeMarkers = [];
   initState();
   document.getElementById('log').innerHTML = '';
   document.getElementById('winDisplay').textContent = '投資してスタート';
@@ -429,6 +440,7 @@ function handleSpinResult(result) {
   wd.className = 'win-display ' + style;
   addLog(`${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`, style === 'miss' ? 'log-miss' : style === '' ? 'log-replay' : 'log-win');
   updateChainDisplay();
+  trackHistory();
 
   renderStatus();
   renderPlayScreen();
@@ -450,6 +462,7 @@ document.getElementById('skipBtn').addEventListener('click', () => {
     spins++;
     const tallyKey = (result.yaku === 'firstBell' || result.yaku === 'missPayout') ? 'miss' : result.yaku;
     tally[tallyKey] = (tally[tallyKey] || 0) + 1;
+    trackHistory();
   }
 
   const summary = Object.entries(tally)
@@ -475,12 +488,14 @@ document.getElementById('judgeBtn').addEventListener('click', () => {
   document.getElementById('hibiscusOverlay').classList.remove('show');
   if (!pendingResult) return;
 
-  const { bonus } = pendingResult;
+  const { bonus, freeze } = pendingResult;
   const hitG = state.gamesSinceLastBonus + 1; // このスピンでボーナス間G数がリセットされる前の値
   if (bonus === 'big') bigCount++; else regCount++;
   trackChain(hitG, state.medals);
   state = pendingResult.state;
   pendingResult = null;
+  trackHistory();
+  if (freeze) freezeMarkers.push({ games: state.games, medals: state.medals });
 
   const wd = document.getElementById('winDisplay');
   const label = bonus === 'big' ? '🎰 BIG BONUS!!' : '🎰 REG BONUS!!';
@@ -546,8 +561,9 @@ document.getElementById('runBtn').addEventListener('click', () => {
   let session = null; // { startMedals, hadFreeze, peakGain }
   let chainCount = 0;
   let bestChain = 0;
+  // historyはこのバッチ実行分のみ(床打ちシミュレーション用に純粋な差分が必要なため)。
+  // fullHistory/freezeMarkersはプレイタブ分も含めた通しの履歴で、グラフ描画にはこちらを使う。
   const history = [{ games: state.games, medals: state.medals }];
-  const freezes = [];
 
   while (state.games < totalGames) {
     const wasElevated = ELEVATED_MODES.has(state.mode);
@@ -559,7 +575,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
     if (result.bonus === 'reg') batchReg++;
     if (result.freeze) {
       batchFreeze++;
-      freezes.push({ games: state.games, medals: state.medals });
+      freezeMarkers.push({ games: state.games, medals: state.medals });
     }
     if (result.bonus) {
       // 前回ボーナスからこのボーナスまでのG数(このスピン自体を含む)が32G以内なら連チャン継続
@@ -567,6 +583,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
       bestChain = Math.max(bestChain, chainCount);
     }
     history.push({ games: state.games, medals: state.medals });
+    fullHistory.push({ games: state.games, medals: state.medals });
 
     const nowElevated = ELEVATED_MODES.has(state.mode);
     if (nowElevated && !wasElevated) {
@@ -633,7 +650,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
   yenEl.style.color = yen < 0 ? '#ff4444' : '';
   // 所持メダル = 5,000円単位の追加投資で床打ちした後の実質メダル数(state.medals)
   document.getElementById('statHeldMedals').textContent = `${state.medals}枚`;
-  drawSlumpGraph(history, freezes);
+  drawSlumpGraph(fullHistory, freezeMarkers);
 });
 
 function clearGraph() {
