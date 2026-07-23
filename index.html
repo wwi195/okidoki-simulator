@@ -280,8 +280,13 @@ function currentSetting() {
 function renderStatus() {
   const el = document.getElementById('status');
   const isPlayTab = document.querySelector('.tab-btn.active')?.dataset.tab === 'play';
-  const modePart = isPlayTab ? '' : `モード: <b>${MODE_LABELS[state.mode] || state.mode}</b> / `;
-  el.innerHTML = `${modePart}差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, state.ceiling - state.gamesSinceLastBonus)}</b>`;
+  // 天井までのG数はモードによって値が大きく異なる(32G/200G/1000G)ため、
+  // プレイタブで表示するとモードが推測できてしまう。分析タブでのみ表示する。
+  if (isPlayTab) {
+    el.innerHTML = `差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b>`;
+  } else {
+    el.innerHTML = `モード: <b>${MODE_LABELS[state.mode] || state.mode}</b> / 差枚: <b>${state.medals}</b> / G数: <b>${state.games}</b> / 天井まで: <b>${Math.max(0, state.ceiling - state.gamesSinceLastBonus)}</b>`;
+  }
 }
 
 function updateChainDisplay() {
