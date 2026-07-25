@@ -269,9 +269,13 @@ let chainStartMedals = 0; // 連チャン開始時点の差枚(獲得枚数の�
 // タブを切り替えても、それまでの進行がスランプグラフに反映されるようにする。
 let fullHistory = [{ games: 0, medals: 0 }];
 let freezeMarkers = [];
+// 純差枚(投入したメダル - 払い出させたメダル)の累積値。state.medals(所持メダル)は
+// 投資(+250枚)・精算(0リセット)でも変化するため、グラフや差枚系の統計にはそのまま
+// 使えない。netDiffはスピン・ボーナス確定の払出分だけを加算し、投資・精算では変化させない。
+let netDiff = 0;
 
 function trackHistory() {
-  fullHistory.push({ games: state.games, medals: state.medals });
+  fullHistory.push({ games: state.games, medals: netDiff });
 }
 
 function initState() {
@@ -368,6 +372,7 @@ function resetAll() {
   chainStartMedals = 0;
   fullHistory = [{ games: 0, medals: 0 }];
   freezeMarkers = [];
+  netDiff = 0;
   initState();
   document.getElementById('log').innerHTML = '';
   document.getElementById('winDisplay').textContent = '投資してスタート';
@@ -434,6 +439,7 @@ function handleSpinResult(result) {
   const before = state.medals;
   state = result.state;
   const net = state.medals - before;
+  netDiff += net;
   const style = net > 0 ? 'win' : net === 0 ? '' : 'miss';
   const wd = document.getElementById('winDisplay');
   wd.textContent = `${YAKU_LABELS[result.yaku] || result.yaku} ${net >= 0 ? '+' : ''}${net}枚`;
@@ -453,12 +459,14 @@ document.getElementById('skipBtn').addEventListener('click', () => {
   const tally = {};
 
   while (state.medals >= BET_MEDALS) {
+    const beforeSpin = state.medals;
     const result = playGame(state, setting);
     if (result.bonus) {
       pendingResult = result;
       break;
     }
     state = result.state;
+    netDiff += state.medals - beforeSpin;
     spins++;
     const tallyKey = (result.yaku === 'firstBell' || result.yaku === 'missPayout') ? 'miss' : result.yaku;
     tally[tallyKey] = (tally[tallyKey] || 0) + 1;
@@ -492,10 +500,12 @@ document.getElementById('judgeBtn').addEventListener('click', () => {
   const hitG = state.gamesSinceLastBonus + 1; // このスピンでボーナス間G数がリセットされる前の値
   if (bonus === 'big') bigCount++; else regCount++;
   trackChain(hitG, state.medals);
+  const beforeJudge = state.medals;
   state = pendingResult.state;
+  netDiff += state.medals - beforeJudge;
   pendingResult = null;
   trackHistory();
-  if (freeze) freezeMarkers.push({ games: state.games, medals: state.medals });
+  if (freeze) freezeMarkers.push({ games: state.games, medals: netDiff });
 
   const wd = document.getElementById('winDisplay');
   const label = bonus === 'big' ? '🎰 BIG BONUS!!' : '🎰 REG BONUS!!';
@@ -571,11 +581,12 @@ document.getElementById('runBtn').addEventListener('click', () => {
     const preSpinGap = state.gamesSinceLastBonus;
     const result = playGame(state, setting);
     state = result.state;
+    netDiff += state.medals - preSpinMedals;
     if (result.bonus === 'big') batchBig++;
     if (result.bonus === 'reg') batchReg++;
     if (result.freeze) {
       batchFreeze++;
-      freezeMarkers.push({ games: state.games, medals: state.medals });
+      freezeMarkers.push({ games: state.games, medals: netDiff });
     }
     if (result.bonus) {
       // 前回ボーナスからこのボーナスまでのG数(このスピン自体を含む)が32G以内なら連チャン継続
@@ -583,7 +594,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
       bestChain = Math.max(bestChain, chainCount);
     }
     history.push({ games: state.games, medals: state.medals });
-    fullHistory.push({ games: state.games, medals: state.medals });
+    fullHistory.push({ games: state.games, medals: netDiff });
 
     const nowElevated = ELEVATED_MODES.has(state.mode);
     if (nowElevated && !wasElevated) {
@@ -615,7 +626,7 @@ document.getElementById('runBtn').addEventListener('click', () => {
   // ような半端な減り方はしない)。最終差枚がプラスでも、その過程で一度でも
   // マイナスに落ち込んでいれば、所持金はその分減っているはずなので、最終値
   // だけを見て判定すると所持金の減少を見逃してしまう。
-  const rawFinalMedals = state.medals;
+  const rawFinalMedals = netDiff;
   let shadowMedals = 0;
   let investCount = 0;
   for (let i = 1; i < history.length; i++) {
